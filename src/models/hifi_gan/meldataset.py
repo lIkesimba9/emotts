@@ -170,7 +170,7 @@ class MelDataset(
             self.gold_mels_path, 
             suffix=self.config.data.mels_ext
         )
-        mel_loss = torch.load(mel_filename, map_location="cpu")
+        mel_loss = torch.tensor(np.load(mel_filename)).unsqueeze(0).cpu()
 
         if not self.fine_tuning:
             if self.split:

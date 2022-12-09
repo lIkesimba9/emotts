@@ -62,6 +62,9 @@ class Inferencer:
             checkpoint_path / FASTSPEECH2_MODEL_FILENAME, map_location=config.device
         )
 
+        self.mels_mean = torch.load(checkpoint_path / MELS_MEAN_FILENAME)
+        self.mels_std = torch.load(checkpoint_path / MELS_STD_FILENAME)
+
 
 
     def proceed_data(self) -> None:
@@ -70,14 +73,15 @@ class Inferencer:
             hop_size=self.config.hop_size,
             n_mels=self.config.n_mels,
             config=self.config.data,
-            phonemes_to_id=self.phonemes_to_id,
-            speakers_to_id=self.speakers_to_id,
+            phonemes_to_id=self.phonemes_to_idx,
+            speakers_to_id=self.speakers_to_idx,
             ignore_speakers=self.config.data.ignore_speakers,
             finetune=self.config.finetune,
         )
         self.phonemes_to_id = factory.phoneme_to_id
         self.speakers_to_id = factory.speaker_to_id
         trainset, valset = factory.split_train_valid(0)
+        self.fastspeech2_model = self.fastspeech2_model.eval()
 
         for sample in trainset:
             save_dir = self.fastspeech2_model_mels_path / sample.speaker_id_str
@@ -85,17 +89,17 @@ class Inferencer:
             filepath = save_dir / f"{sample.wav_id}.{self.MEL_EXT}"
             with torch.no_grad():
                 batch = FastSpeech2VoicePrintBatch(
-                    speaker_ids=torch.LongTensor(np.array(sample.speaker_id)),
-                    phonemes=torch.LongTensor(np.array(sample.phonemes)),
-                    num_phonemes=torch.LongTensor(np.array(sample.num_phonemes)),
-                    mels_lens=torch.LongTensor(np.array(sample.mel.shape[1])),
-                    mels= torch.LongTensor(np.array(sample.mel)).to(self.device).permute(0, 2, 1).float(),
-                    energies=torch.LongTensor(np.array(sample.energy)),
-                    pitches=torch.LongTensor(np.array(sample.pitch)),
-                    durations=torch.LongTensor(np.array(sample.duration)),
-                    speaker_embs=torch.LongTensor(np.array(sample.speaker_emb)),
+                    speaker_ids=torch.LongTensor(np.array([sample.speaker_id])).to(self.device),
+                    phonemes=torch.LongTensor(np.array([sample.phonemes])).to(self.device),
+                    num_phonemes=torch.LongTensor(np.array([sample.num_phonemes])).to(self.device),
+                    mels_lens=torch.LongTensor(np.array([sample.mel.shape[1]])).to(self.device),
+                    mels= sample.mel.unsqueeze(0).permute(0, 2, 1).to(self.device).float(),
+                    energies=torch.LongTensor(np.array([sample.energy])).to(self.device),
+                    pitches=torch.LongTensor(np.array([sample.pitch])).to(self.device),
+                    durations=torch.LongTensor(np.array([sample.duration])).to(self.device),
+                    speaker_embs=torch.LongTensor(np.array(sample.speaker_emb)).unsqueeze(0).to(self.device),
                 )
-                _, output, _, _ = self.fastspeech2_model(batch)
+                _, output, _, _, _, _, _, _ = self.fastspeech2_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
                 output = output * self.mels_std.to(self.device) + self.mels_mean.to(self.device)
 
