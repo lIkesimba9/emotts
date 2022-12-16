@@ -1,5 +1,6 @@
 
 import torch
+import os
 
 def main() -> None:
 
@@ -12,17 +13,19 @@ def main() -> None:
     #model = torch.load('checkpoints/nat_va_after_duration/feature/1_feature_model.pth', map_location=device)
 
     checkpoint_list = [
-        'checkpoints/fastspeech2/fastspeech2/1_fastspeech2_model.pth',
-        #'checkpoints/fastspeech2_reduced_va/fastspeech2/1_fastspeech2_model.pth',
-        #'checkpoints/nat_inflated/feature/300_feature_model.pth',
-        #'checkpoints/nat_va_before_duration/feature/1_feature_model.pth',
-        #'checkpoints/nat_va_after_duration/feature/1_feature_model.pth'
+        'checkpoints/nat_base/feature/1_feature_model.pth',
+        'checkpoints/fastspeech2/fastspeech2/fastspeech2_model.pth',
+        'checkpoints/fastspeech2_reduced_va/fastspeech2/1_fastspeech2_model.pth',
+        'checkpoints/nat_inflated/feature/300_feature_model.pth',
+        'checkpoints/nat_va_before_duration/feature/1_feature_model.pth',
+        'checkpoints/nat_va_after_duration/feature/1_feature_model.pth'
     ]
-    print(len(checkpoint_list))
+    #print(len(checkpoint_list))
 
     for i in range(len(checkpoint_list)):
         checkpoint_name = checkpoint_list[i]
         get_weights_num(checkpoint_name, device)
+        print(os.path.getsize(checkpoint_name))
 
 
 def get_weights_num(checkpoint_name, device):
@@ -45,8 +48,8 @@ def get_weights_num(checkpoint_name, device):
     #sum_p = 0
     for n,m in model.named_modules():
         
-        #if '.' not in n and n != '':
-        if True:
+        if '.' not in n and n != '':
+        #if True:
         #if 'decoder' in n and n != '':
             counter += 1
             # if counter < 4:

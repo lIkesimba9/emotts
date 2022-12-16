@@ -190,3 +190,58 @@ class FastSpeech2DurationLoss(nn.Module):
             postnet_mel_loss,
             duration_loss,
         )
+
+
+
+
+class FastSpeech2LossNoVPDurationOnly(nn.Module):
+    """ FastSpeech2 Loss """
+
+    def __init__(self):
+        super(FastSpeech2LossNoVPDurationOnly, self).__init__()
+
+        self.mse_loss = nn.MSELoss()
+        self.mae_loss = nn.L1Loss()
+
+    def forward(self, batch: FastSpeech2Batch, mel_predictions,
+                    postnet_mel_predictions,
+                    log_duration_predictions,
+                    src_masks,
+                    mel_masks
+                ):
+
+        src_masks = ~src_masks
+        mel_masks = ~mel_masks
+        log_duration_targets = torch.log(batch.durations.float() + 1)
+        mel_targets = batch.mels[:, : mel_masks.shape[1], :]
+        mel_masks = mel_masks[:, :mel_masks.shape[1]]
+
+        log_duration_targets.requires_grad = False
+        batch.pitches.requires_grad = False
+        batch.energies.requires_grad = False
+        mel_targets.requires_grad = False
+
+        log_duration_predictions = log_duration_predictions.masked_select(src_masks)
+        log_duration_targets = log_duration_targets.masked_select(src_masks)
+
+        mel_predictions = mel_predictions.masked_select(mel_masks.unsqueeze(-1))
+        postnet_mel_predictions = postnet_mel_predictions.masked_select(
+            mel_masks.unsqueeze(-1)
+        )
+        mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
+
+        mel_loss = self.mae_loss(mel_predictions, mel_targets)
+        postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
+
+        duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
+
+        total_loss = (
+            mel_loss + postnet_mel_loss + duration_loss 
+        )
+
+        return (
+            total_loss,
+            mel_loss,
+            postnet_mel_loss,
+            duration_loss,
+        )

@@ -278,3 +278,47 @@ class Conv(nn.Module):
         x = x.contiguous().transpose(1, 2)
 
         return x
+
+
+
+class VarianceAdaptorDurationOnly(nn.Module):
+    """Variance Adaptor"""
+
+    def __init__(self, config: VarianceAdaptorParams, pitch_min: float, pitch_max: float, 
+            energy_min: float, energy_max: float, encoder_hidden: int):
+        super(VarianceAdaptorDurationOnly, self).__init__()
+        self.duration_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
+        self.length_regulator = LengthRegulator()
+
+
+    def forward(self, x, src_mask, mel_mask, max_len, pitch_target, energy_target, duration_target,
+        p_control=1.0,
+        e_control=1.0,
+        d_control=1.0,
+    ):
+
+        log_duration_prediction = self.duration_predictor(x, src_mask)
+
+        x, _ = self.length_regulator(x, duration_target, max_len)
+
+        return (
+            x,
+            log_duration_prediction,
+            mel_mask,
+        )
+    
+    def inference(self, x, src_mask, p_control=1.0, e_control=1.0, d_control=1.0):
+        log_duration_prediction = self.duration_predictor(x, src_mask)
+
+        duration_rounded = torch.clamp(
+            (torch.round(torch.exp(log_duration_prediction) - 1) * d_control),
+            min=0,
+        )
+        x, mel_len = self.length_regulator(x, duration_rounded, None)
+        mel_mask = get_mask_from_lengths(mel_len, torch.max(mel_len).item(), mel_len.device)
+
+        return (
+            x,
+            mel_len,
+            mel_mask,
+        )

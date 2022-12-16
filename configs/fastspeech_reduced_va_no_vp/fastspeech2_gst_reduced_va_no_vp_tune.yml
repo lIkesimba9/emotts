@@ -13,13 +13,13 @@ iters_per_checkpoint: 100000
 total_iterations: 300001
 finetune: true
 test_size: 0.05
-device: cuda:0
+device: cuda:1
 lang: english
-checkpoint_name: fastspeech2_tune
+checkpoint_name: fastspeech2_reduced_va_no_vp_tune
 data:
   mels_dir: data/preprocessed/mels
   wav_dir: data/preprocessed/resampled
-  feature_dir: data/feature_output/fastspeech_base
+  feature_dir: data/feature_output/fastspeech_reduced_va_no_vp
   duration_dir: data/preprocessed/duration
   pitch_dir: data/preprocessed/pitch
   energy_dir: data/preprocessed/energy
@@ -32,7 +32,7 @@ data:
     - "0014"
     - "0020"
 pretrained_hifi: models/en/hifi
-base_model: checkpoints/fastspeech2/fastspeech2
+base_model: checkpoints/fastspeech2_reduced_va_no_vp/fastspeech2
 
 gst_config:
   ref_enc_filters:
