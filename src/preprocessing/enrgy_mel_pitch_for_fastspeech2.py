@@ -178,7 +178,7 @@ def seconds_to_frame(seconds: float) -> float:
     return seconds * SAMPLE_RATE / HOP_SIZE
 
 def get_alignment(tier):
-    phone_collection = [ x.text if x.text != "" else "sil"  for x in tier.get_copy_with_gaps_filled()]
+    phone_collection = [ x.text for x in tier.get_copy_with_gaps_filled()]
     duration_collecton = np.array(
         [
             seconds_to_frame(x.duration())

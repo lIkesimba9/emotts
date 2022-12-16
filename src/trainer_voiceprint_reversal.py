@@ -428,7 +428,7 @@ class Trainer:
     def generate_samples(self) -> None:
 
         phonemes = [
-            [self.phonemes_to_id.get(p, 0) for p in sequence]
+            [self.phonemes_to_id.get(p, 0) for p in sequence.split(" ")]
             for sequence in GENERATED_PHONEMES
         ]
         audio_folder = self.checkpoint_path / f"{self.iteration_step}"
