@@ -132,7 +132,7 @@ class FastSpeech2Dataset(Dataset[FastSpeech2Sample]):
             self._phoneme_to_id[phoneme] for phoneme in phoneme_collection
         ]
 
-        duration: np.array = np.load(info.duration_path)
+        duration: np.array = np.around(np.load(info.duration_path))
 
         mels: torch.Tensor = torch.Tensor(np.load(info.mel_path))
         mels = (mels - self.mels_mean) / self.mels_std

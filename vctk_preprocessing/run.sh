@@ -1,5 +1,8 @@
 #!/bin/bash
 conda activate emotts
+cd repo
+export OUTPUT_DIR=data
+:' 
 cd repo/data
 
 export OUTPUT_DIR=data
@@ -61,11 +64,12 @@ rm -rf temp
 echo -e "\n9. MFA Postprocessing"
 # Aggregate mels by speakers
 python src/preprocessing/mfa_postprocessing.py --input-dir $OUTPUT_DIR/processed/vctk/resampled
-
+'
 echo -e "\n10. Compute pitch, mels, energy, duration for fastspeech2"
 
 python src/preprocessing/enrgy_mel_pitch_for_fastspeech2.py --input-audio-dir $OUTPUT_DIR/processed/vctk/resampled --input-textgrid-dir $OUTPUT_DIR/processed/vctk/mfa_outputs  --output-dir $OUTPUT_DIR/processed/vctk/fastspeech2 --audio-ext flac
-
+:'
 gdown --fuzzy  https://drive.google.com/file/d/1q8mEGwCkFy23KZsinbuvdKAQLqNKbYf1/view?usp=sharing -O models/encoder.pt
 echo -e "\n11. Compute embeddings"
 python src/preprocessing/generate_speaker_embegigs.py --input-dir $OUTPUT_DIR/processed/vctk/resampled --output-dir $OUTPUT_DIR/processed/vctk/embeddings  --audio-ext flac --model-path models/encoder.pt
+'

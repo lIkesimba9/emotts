@@ -135,7 +135,7 @@ class FastSpeech2VoicePrintDataset(Dataset[FastSpeech2VoicePrintSample]):
             self._phoneme_to_id[phoneme] for phoneme in phoneme_collection
         ]
 
-        duration: np.array = np.load(info.duration_path)
+        duration: np.array = np.around(np.load(info.duration_path))
 
         mels: torch.Tensor = torch.Tensor(np.load(info.mel_path))
         mels = (mels - self.mels_mean) / self.mels_std
@@ -220,6 +220,7 @@ class FastSpeech2VoicePrintFactory:
         self._phones_ext = config.phones_ext
         self.phoneme_to_id: Dict[str, int] = phonemes_to_id
         self.phoneme_to_id[PAD_TOKEN] = 0
+        self.phoneme_to_id[""] = 1
         self.speaker_to_id: Dict[str, int] = speakers_to_id
         self.ignore_speakers = ignore_speakers
         if finetune:
@@ -235,8 +236,8 @@ class FastSpeech2VoicePrintFactory:
         self.energy_mean, self.energy_std = self._get_mean_and_std_scalar(self._energy_dir, self._fastspeech2_ext)
         self.energy_min, self.energy_max = self._get_min_max(self._energy_dir, self._fastspeech2_ext, self.energy_mean, self.energy_std)
         
-        self.energy_min = (self.energy_min - self.energy_mean) / self.energy_std
-        self.energy_max = (self.energy_max - self.energy_mean) / self.energy_std
+        #self.energy_min = (self.energy_min - self.energy_mean) / self.energy_std
+        #self.energy_max = (self.energy_max - self.energy_mean) / self.energy_std
         
         self.pitch_mean, self.pitch_std = self._get_mean_and_std_scalar(self._pitch_dir, self._fastspeech2_ext)
         self.pitch_min, self.pitch_max = self._get_min_max(self._pitch_dir, self._fastspeech2_ext, self.pitch_mean, self.pitch_std)

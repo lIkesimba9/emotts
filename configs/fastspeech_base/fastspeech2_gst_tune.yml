@@ -25,12 +25,7 @@ data:
   energy_dir: data/preprocessed/energy
   phones_dir: data/preprocessed/phones
   speaker_emb_dir: data/preprocessed/embeddings
-  ignore_speakers:
-    - "0011"
-    - "0012"
-    - "0013"
-    - "0014"
-    - "0020"
+  ignore_speakers: []
 pretrained_hifi: models/en/hifi
 base_model: checkpoints/fastspeech2/fastspeech2
 

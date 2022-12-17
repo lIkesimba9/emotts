@@ -30,7 +30,7 @@ REFERENCE_PATH = Path("references")
 SPEAKER_PRINT_DIR = Path("speakers_prints")
 REMOVE_SPEAKERS = ["p280", "p315", "0019"]
 
-huawei_phones = [
+PHONEMES_ENG = [
     ' D UW1 Y UW1 R IY1 AH0 L AY2 Z W AH1 T T AY1 M IH1 T IH1 Z  ',
     ' HH IY1 K AH1 M Z B AE1 K T UW1 DH AH0 V AE1 L IY0  ',
     ' DH IH1 S D R EH1 S D AH1 Z N AA1 T L UH1 K W ER1 TH M AH1 CH  ',

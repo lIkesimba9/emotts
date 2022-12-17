@@ -26,7 +26,6 @@ N_FFT = 1024
 N_MELS = 80
 SAMPLE_RATE = 22050
 FILTER_LENGTH = 1024
-PAD_TOKEN = "<PAD>"
 
 
 def _convert_to_continuous_f0(f0: np.array) -> np.array:
@@ -85,8 +84,6 @@ def main(input_audio_dir: Path, input_textgrid_dir: Path, output_dir: Path, audi
         if output == None:
             continue
         phones, duration, pitch, energy, mel_spectrogram = output
-        if "spn" in phones:
-            continue
         # [size],           [size] [size]  [n_mels x time]
         new_mel_path = output_dir / Path("mels") / Path(tg_path.parent.stem)
         new_pitch_path = output_dir / Path("pitch") / Path(tg_path.parent.stem)
@@ -114,12 +111,20 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
     stft: Audio.stft.TacotronSTFT
 ) -> Tuple[List, List, List, List]:
     textgrid = tgt.io.read_textgrid(textgrid_path)
-    phone_collection, duration_collecton = get_alignment(
+    phone_collection, duration_collecton, start_time, end_time = get_alignment(
         textgrid.get_tier_by_name("phones")
     )
 
+    if start_time >= end_time:
+        print("ERROR START BIGGER END")
+        exit(-1)
+
     # Read and trim wav files
     wav, _ = librosa.load(audio_path)
+    wav = wav[
+        int(SAMPLE_RATE * start_time) : int(SAMPLE_RATE * end_time)
+    ].astype(np.float32)
+
 
     # Compute fundamental frequency
     pitch, t = pw.dio(
@@ -128,18 +133,15 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
         frame_period=HOP_SIZE / SAMPLE_RATE * 1000,
     )
     pitch = pw.stonemask(wav.astype(np.float64), pitch, t, SAMPLE_RATE)
+
+    pitch = pitch[: sum(duration_collecton)]
+    if np.sum(pitch != 0) <= 1:
+        return None
+
+    # Compute mel-scale spectrogram and energy
     mel_spectrogram, energy = Audio.tools.get_mel_from_wav(wav, stft)
-    
-    pad_size = mel_spectrogram.shape[-1] - np.int64(duration_collecton.sum())
-
-    if pad_size < 0:
-        duration_collecton[-1] += pad_size
-        assert duration_collecton[-1] >= 0
-    if pad_size > 0:
-        phone_collection.append(PAD_TOKEN)
-        duration_collecton = np.append(duration_collecton, pad_size)
-
-
+    mel_spectrogram = mel_spectrogram[:, : sum(duration_collecton)]
+    energy = energy[: sum(duration_collecton)]
     # perform linear interpolation
     pitch = _convert_to_continuous_f0(pitch)
 
@@ -147,12 +149,8 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
     # Phoneme-level average
     pos = 0
     for i, d in enumerate(duration_collecton):
-        d = np.around(d).astype(np.int32)
         if d > 0:
-            if len(pitch[pos : pos + d]) != 0:
-                pitch[i] = np.mean(pitch[pos : pos + d])
-            else:
-                pitch[i] = 0
+            pitch[i] = np.mean(pitch[pos : pos + d])
         else:
             pitch[i] = 0
         pos += d
@@ -161,12 +159,8 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
     # Phoneme-level average
     pos = 0
     for i, d in enumerate(duration_collecton):
-        d = np.around(d).astype(np.int32)
         if d > 0:
-            if len(energy[pos : pos + d]) != 0:
-                energy[i] = np.mean(energy[pos : pos + d])
-            else:
-                energy[i] = 0
+            energy[i] = np.mean(energy[pos : pos + d])
         else:
             energy[i] = 0
         pos += d
@@ -174,20 +168,44 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
 
     return phone_collection, duration_collecton, pitch, energy, mel_spectrogram
 
-def seconds_to_frame(seconds: float) -> float:
-    return seconds * SAMPLE_RATE / HOP_SIZE
+def get_alignment(tier) -> Tuple[List, float, float]:
+    sil_phones = [""]
 
-def get_alignment(tier):
-    phone_collection = [ x.text for x in tier.get_copy_with_gaps_filled()]
-    duration_collecton = np.array(
-        [
-            seconds_to_frame(x.duration())
-            for x in tier.get_copy_with_gaps_filled()
-        ],
-        dtype=np.float32,
-    )
+    phone_collection = []
+    duration_collecton = []
+    start_time_result = 0
+    end_time_result = 0
+    end_idx = 0
+    for t in tier.get_copy_with_gaps_filled():
+        start_time, end_time, phone = t.start_time, t.end_time, t.text
 
-    return phone_collection, duration_collecton    
+        # Trim leading silences
+        if phone_collection == []:
+            if phone in sil_phones:
+                continue
+            else:
+                start_time_result = start_time
+
+        if phone not in sil_phones:
+            # For ordinary phones
+            phone_collection.append(phone)
+            end_time_result = end_time
+            end_idx = len(phone_collection)
+        else:
+            # For silent phones
+            phone_collection.append(phone)
+
+        duration_collecton.append(
+            int(
+                np.round(end_time * SAMPLE_RATE / HOP_SIZE)
+                - np.round(start_time * SAMPLE_RATE / HOP_SIZE)
+            )
+        )
+    # Trim tailing silences
+    phone_collection = phone_collection[:end_idx]
+    duration_collecton = duration_collecton[:end_idx]
+
+    return phone_collection, duration_collecton, start_time_result, end_time_result    
 
 if __name__ == "__main__":
     main()
