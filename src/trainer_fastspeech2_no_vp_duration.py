@@ -517,7 +517,7 @@ class Trainer:
     def generate_samples(self) -> None:
 
         phonemes = [
-            [self.phonemes_to_id.get(p, 0) for p in sequence]
+            [self.phonemes_to_id.get(p, 0) for p in sequence.split(" ")]
             for sequence in (PHONEMES_ENG if self.config.lang == "english" else PHONEMES_CHI)
         ]
 

@@ -9,7 +9,7 @@ seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
-iters_per_checkpoint: 100000
+iters_per_checkpoint: 30000
 total_iterations: 300001
 finetune: true
 test_size: 0.05
@@ -25,12 +25,7 @@ data:
   energy_dir: data/preprocessed/energy
   phones_dir: data/preprocessed/phones
   speaker_emb_dir: data/preprocessed/embeddings
-  ignore_speakers:
-    - "0011"
-    - "0012"
-    - "0013"
-    - "0014"
-    - "0020"
+  ignore_speakers: []
 pretrained_hifi: models/en/hifi
 base_model: checkpoints/nat_va_before_duration/feature
 

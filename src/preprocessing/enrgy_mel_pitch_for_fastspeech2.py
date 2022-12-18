@@ -84,6 +84,8 @@ def main(input_audio_dir: Path, input_textgrid_dir: Path, output_dir: Path, audi
         if output == None:
             continue
         phones, duration, pitch, energy, mel_spectrogram = output
+        if "spn" in phones:
+            continue
         # [size],           [size] [size]  [n_mels x time]
         new_mel_path = output_dir / Path("mels") / Path(tg_path.parent.stem)
         new_pitch_path = output_dir / Path("pitch") / Path(tg_path.parent.stem)
@@ -169,14 +171,14 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
     return phone_collection, duration_collecton, pitch, energy, mel_spectrogram
 
 def get_alignment(tier) -> Tuple[List, float, float]:
-    sil_phones = ["sil", "sp", "spn"]
+    sil_phones = [""]
 
     phone_collection = []
     duration_collecton = []
     start_time_result = 0
     end_time_result = 0
     end_idx = 0
-    for t in tier._objects:
+    for t in tier.get_copy_with_gaps_filled():
         start_time, end_time, phone = t.start_time, t.end_time, t.text
 
         # Trim leading silences
