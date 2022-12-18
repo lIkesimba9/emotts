@@ -6,14 +6,14 @@ win_size: 1024
 n_fft: 1024
 n_mels: 80
 seed: 42
-batch_size: 32
+batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
 iters_per_checkpoint: 30000
 total_iterations: 500001
 finetune: false
 test_size: 0.05
-device: cuda:1
+device: cuda:0
 lang: english
 checkpoint_name: fastspeech2_reduced_va
 data:

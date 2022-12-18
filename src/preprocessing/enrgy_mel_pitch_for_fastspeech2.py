@@ -84,6 +84,8 @@ def main(input_audio_dir: Path, input_textgrid_dir: Path, output_dir: Path, audi
         if output == None:
             continue
         phones, duration, pitch, energy, mel_spectrogram = output
+        if "spn" in phones:
+            continue
         # [size],           [size] [size]  [n_mels x time]
         new_mel_path = output_dir / Path("mels") / Path(tg_path.parent.stem)
         new_pitch_path = output_dir / Path("pitch") / Path(tg_path.parent.stem)
