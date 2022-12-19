@@ -186,12 +186,18 @@ class VoicePrintVarianceFactory:
         
         #self.energy_min = (self.energy_min - self.energy_mean) / self.energy_std
         #self.energy_max = (self.energy_max - self.energy_mean) / self.energy_std
-        
+        if self.energy_min != 0:
+            self.energy_min = np.log(self.energy_min)
+        self.energy_max = np.log(self.energy_max)
+
         self.pitch_mean, self.pitch_std = self._get_mean_and_std_scalar(self._pitch_dir, self._mels_ext)
         self.pitch_min, self.pitch_max = self._get_min_max(self._pitch_dir, self._mels_ext, self.pitch_mean, self.pitch_std)
         
         #self.pitch_min = (self.pitch_min - self.pitch_mean) / self.pitch_std
         #self.pitch_max = (self.pitch_max - self.pitch_mean) / self.pitch_std
+        if self.pitch_min != 0:
+            self.pitch_min = np.log(self.pitch_min)
+        self.pitch_max = np.log(self.pitch_max)
 
     @staticmethod
     def add_to_mapping(mapping: Dict[str, int], token: str) -> None:

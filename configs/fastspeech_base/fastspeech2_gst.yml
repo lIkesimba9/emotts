@@ -9,7 +9,7 @@ seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
-iters_per_checkpoint: 30000
+iters_per_checkpoint: 100000
 total_iterations: 500001
 finetune: false
 test_size: 0.05

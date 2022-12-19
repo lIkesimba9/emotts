@@ -23,7 +23,7 @@ data:
   duration_dir: data/preprocessed/duration
   pitch_dir: data/preprocessed/pitch
   energy_dir: data/preprocessed/energy
-  phones_dir: data/preprocessed/phones
+  text_dir: data/preprocessed/mfa_outputs
   speaker_emb_dir: data/preprocessed/embeddings
   ignore_speakers: []
 pretrained_hifi: models/en/hifi

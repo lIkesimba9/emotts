@@ -250,7 +250,8 @@ class FastSpeech2VoicePrintFactory:
         
         #self.energy_min = (self.energy_min - self.energy_mean) / self.energy_std
         #self.energy_max = (self.energy_max - self.energy_mean) / self.energy_std
-        self.energy_min = np.log(self.energy_min)
+        if self.energy_min != 0:
+            self.energy_min = np.log(self.energy_min)
         self.energy_max = np.log(self.energy_max)
 
 
@@ -259,7 +260,8 @@ class FastSpeech2VoicePrintFactory:
         
         #self.pitch_min = (self.pitch_min - self.pitch_mean) / self.pitch_std
         #self.pitch_max = (self.pitch_max - self.pitch_mean) / self.pitch_std
-        self.pitch_min = np.log(self.pitch_min)
+        if self.pitch_min != 0:
+            self.pitch_min = np.log(self.pitch_min)
         self.pitch_max = np.log(self.pitch_max)
 
     @staticmethod
