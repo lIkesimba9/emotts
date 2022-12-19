@@ -11,7 +11,6 @@ class DatasetParams:
     duration_dir: str
     pitch_dir: str
     energy_dir: str
-    phones_dir: str
     ignore_speakers: List[str]
     text_ext: str = field(default=".TextGrid")
     mels_ext: str = field(default=".npy")
@@ -21,3 +20,4 @@ class DatasetParams:
         default_factory=lambda: [f"00{i}" for i in range(11, 21)]
     )
     speaker_emb_dir: Optional[str] = field(default=None)
+    text_dir: Optional[str] = field(default=None)

@@ -27,7 +27,7 @@ python src/preprocessing/resampling.py --input-dir $OUTPUT_DIR/processed/esd/$la
 
 echo -e "\n5. Text normalization"
 python src/preprocessing/text_normalization.py --input-dir $OUTPUT_DIR/processed/esd/$language/text --output-dir $OUTPUT_DIR/processed/esd/$language/mfa_inputs --language $language 
-
+'
 
 echo -e "\n6. MFA Alignment setup"
 
@@ -37,32 +37,30 @@ mkdir -p models
 [ $language == "chinese" ] && wget -q --show-progress https://raw.githubusercontent.com/lIkesimba9/FreeST_mfa_align/main/model/pinyin-lexicon_with_tab.dict -P models
 
 [ $language == "english" ] && wget -q --show-progress https://github.com/MontrealCorpusTools/mfa-models/raw/main/acoustic/english.zip -P models
-[ $language == "english" ] && wget -q --show-progress https://raw.githubusercontent.com/lIkesimba9/FreeST_mfa_align/main/librispeech-lexicon_with_tab.txt -P models
+[ $language == "english" ] && wget -q --show-progress http://www.openslr.org/resources/11/librispeech-lexicon.txt -P models
 
 conda env config vars set LD_LIBRARY_PATH=$CONDA_PREFIX/lib  # link to libopenblas
 conda deactivate
 conda activate emotts
-
+:'
 echo -e "\n7. MFA Preprocessing"
 python src/preprocessing/mfa_preprocessing.py --input-dir $OUTPUT_DIR/processed/esd/$language/resampled --output-dir $OUTPUT_DIR/processed/esd/$language/mfa_inputs
+'
 
-conda env config vars set LD_LIBRARY_PATH=$CONDA_PREFIX/lib  # link to libopenblas
-conda deactivate
-conda activate emotts
 # FINALLY, align phonemes and speech
 
 echo -e "\n8. MFA Alignment"
 
-[ $language == "english" ] && mfa align -t ./temp --clean -j 4 $OUTPUT_DIR/processed/esd/$language/mfa_inputs models/librispeech-lexicon_with_tab.txt models/english.zip $OUTPUT_DIR/processed/esd/$language/mfa_outputs
+[ $language == "english" ] && mfa align -t ./temp --clean -j 4 $OUTPUT_DIR/processed/esd/$language/mfa_inputs models/librispeech-lexicon.txt models/english.zip $OUTPUT_DIR/processed/esd/$language/mfa_outputs
 [ $language == "chinese" ] && mfa align -t ./temp --clean -j 4 $OUTPUT_DIR/processed/esd/$language/mfa_inputs models/pinyin-lexicon_with_tab.dict models/freest.zip $OUTPUT_DIR/processed/esd/$language/mfa_outputs
 
 rm -rf temp
-
+:'
 echo -e "\n9. MFA Postprocessing"
 # Aggregate mels by speakers
 python src/preprocessing/mfa_postprocessing.py --input-dir $OUTPUT_DIR/processed/esd/$language/resampled
-
 '
+
 echo -e "\n10. Compute pitch, mels, energy, duration for fastspeech2"
 
 python src/preprocessing/enrgy_mel_pitch_for_fastspeech2.py --input-audio-dir $OUTPUT_DIR/processed/esd/$language/resampled --input-textgrid-dir $OUTPUT_DIR/processed/esd/$language/mfa_outputs  --output-dir $OUTPUT_DIR/processed/esd/$language/fastspeech2 --audio-ext wav

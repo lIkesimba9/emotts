@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 from sklearn.preprocessing import StandardScaler
+import tgt
 
 from src.data_process.config import DatasetParams
 from src.constants import REMOVE_SPEAKERS
@@ -37,7 +38,6 @@ class FastSpeech2VoicePrintSample:
 @dataclass
 class FastSpeech2VoicePrintInfo:
 
-    phonemes_path: Path
     mel_path: Path
     energy_path: Path
     duration_path: Path
@@ -45,6 +45,7 @@ class FastSpeech2VoicePrintInfo:
     speaker_id: int
     phonemes_length: int
     speaker_path: Path
+    text_path: Path
 
 
 @dataclass
@@ -130,24 +131,35 @@ class FastSpeech2VoicePrintDataset(Dataset[FastSpeech2VoicePrintSample]):
     def __getitem__(self, idx: int) -> FastSpeech2VoicePrintSample:
 
         info = self._dataset[idx]
-        phoneme_collection = open(info.phonemes_path).read().split(" ")
+        text_grid = tgt.read_textgrid(info.text_path)
+        phones_tier = text_grid.get_tier_by_name(PHONES_TIER)
         phoneme_ids = [
-            self._phoneme_to_id[phoneme] for phoneme in phoneme_collection
+            self._phoneme_to_id[x.text] for x in phones_tier.get_copy_with_gaps_filled()
         ]
 
-        duration: np.array = np.around(np.load(info.duration_path))
+
+        durations: np.array = np.load(info.duration_path)
 
         mels: torch.Tensor = torch.Tensor(np.load(info.mel_path))
         mels = (mels - self.mels_mean) / self.mels_std
-        
 
-        energy = self.normalize(np.load(info.energy_path), self.energy_mean, self.energy_std)        
+        pad_size = mels.shape[-1] - np.int64(durations.sum())
+        if pad_size < 0:
+            durations[-1] += pad_size
+            assert durations[-1] >= 0
+        if pad_size > 0:
+            phoneme_ids.append(self._phoneme_to_id[PAD_TOKEN])        
+
+        #energy = self.normalize(np.load(info.energy_path), self.energy_mean, self.energy_std)
+        energy = np.load(info.energy_path)
+        nonzero_idxs = np.where(energy != 0)[0]
+        energy[nonzero_idxs] = np.log(energy[nonzero_idxs])
 
         pitch = np.load(info.pitch_path)
         nonzero_idxs = np.where(pitch != 0)[0]
         pitch[nonzero_idxs] = np.log(pitch[nonzero_idxs])
 
-        speaker_embs: np.ndarray = np.load(str(info.speaker_path))
+        speaker_embs: np.ndarray = np.load(info.speaker_path)
         speaker_embs_tensor = torch.from_numpy(speaker_embs)
 
 
@@ -157,7 +169,7 @@ class FastSpeech2VoicePrintDataset(Dataset[FastSpeech2VoicePrintSample]):
             num_phonemes=len(phoneme_ids),
             speaker_id=info.speaker_id,
             mel=mels,
-            duration=duration,
+            duration=durations,
             energy=energy,
             pitch=pitch,
             speaker_id_str=info.pitch_path.parent.name,
@@ -212,12 +224,12 @@ class FastSpeech2VoicePrintFactory:
         self.finetune = finetune
         self._mels_dir = Path(config.mels_dir)
         self._pitch_dir = Path(config.pitch_dir)
-        self._phones_dir = Path(config.phones_dir)
         self._energy_dir = Path(config.energy_dir)
+        self._text_ext = config.text_ext
+        self._text_dir = Path(config.text_dir)
         self._duration_dir = Path(config.duration_dir)
         self._speaker_emb_dir = Path(config.speaker_emb_dir)
         self._fastspeech2_ext = config.fastspeech2_ext
-        self._phones_ext = config.phones_ext
         self.phoneme_to_id: Dict[str, int] = phonemes_to_id
         self.phoneme_to_id[PAD_TOKEN] = 0
         self.phoneme_to_id[""] = 1
@@ -238,12 +250,17 @@ class FastSpeech2VoicePrintFactory:
         
         #self.energy_min = (self.energy_min - self.energy_mean) / self.energy_std
         #self.energy_max = (self.energy_max - self.energy_mean) / self.energy_std
-        
+        self.energy_min = np.log(self.energy_min)
+        self.energy_max = np.log(self.energy_max)
+
+
         self.pitch_mean, self.pitch_std = self._get_mean_and_std_scalar(self._pitch_dir, self._fastspeech2_ext)
         self.pitch_min, self.pitch_max = self._get_min_max(self._pitch_dir, self._fastspeech2_ext, self.pitch_mean, self.pitch_std)
         
         #self.pitch_min = (self.pitch_min - self.pitch_mean) / self.pitch_std
         #self.pitch_max = (self.pitch_max - self.pitch_mean) / self.pitch_std
+        self.pitch_min = np.log(self.pitch_min)
+        self.pitch_max = np.log(self.pitch_max)
 
     @staticmethod
     def add_to_mapping(mapping: Dict[str, int], token: str) -> None:
@@ -326,15 +343,15 @@ class FastSpeech2VoicePrintFactory:
             Path(x.parent.name) / x.stem
             for x in self._duration_dir.rglob(f"*{self._fastspeech2_ext}")
         }
-        phones_set = {
+        texts_set = {
             Path(x.parent.name) / x.stem
-            for x in self._phones_dir.rglob(f"*{self._phones_ext}")
+            for x in self._text_dir.rglob(f"*{self._text_ext}")
         }
         speaker_emb_set = {
             Path(x.parent.name) / x.stem
             for x in self._speaker_emb_dir.rglob(f"*{self._fastspeech2_ext}")
         }       
-        samples = list(mels_set & duration_set & pitch_set & enegry_set & phones_set & speaker_emb_set)
+        samples = list(mels_set & duration_set & pitch_set & enegry_set & texts_set & speaker_emb_set)
         for sample in tqdm(samples):
             if sample.parent.name in REMOVE_SPEAKERS:
                 continue
@@ -343,22 +360,26 @@ class FastSpeech2VoicePrintFactory:
             energy_path = (self._energy_dir / sample).with_suffix(self._fastspeech2_ext)
             pitch_path = (self._pitch_dir / sample).with_suffix(self._fastspeech2_ext)
             duration_path = (self._duration_dir / sample).with_suffix(self._fastspeech2_ext)
-            phonemes_path = (self._phones_dir / sample).with_suffix(self._phones_ext)
+            tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
             speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._fastspeech2_ext)
             self.add_to_mapping(self.speaker_to_id, sample.parent.name)
+            text_grid = tgt.read_textgrid(tg_path)
             
             speaker_id = self.speaker_to_id[sample.parent.name]
-            phonemes = open(phonemes_path).read().split(" ")
-            if len(phonemes) > 0:
+            if PHONES_TIER in text_grid.get_tier_names():
 
+                phones_tier = text_grid.get_tier_by_name(PHONES_TIER)
+                phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
+                if "spn" in phonemes:
+                    continue
                 for phoneme in phonemes:
                     self.add_to_mapping(self.phoneme_to_id, phoneme)
 
                 if sample.parent.name in self.speaker_to_use:
                     dataset.append(
                         FastSpeech2VoicePrintInfo(
+                            text_path=tg_path,
                             phonemes_length=len(phonemes),
-                            phonemes_path=phonemes_path,
                             energy_path=energy_path,
                             duration_path=duration_path,
                             pitch_path=pitch_path,
@@ -378,7 +399,7 @@ class FastSpeech2VoicePrintFactory:
         for mel_path in self._mels_dir.rglob(f"*{self._fastspeech2_ext}"):
             if mel_path.parent.name in REMOVE_SPEAKERS:
                 continue
-            mels: torch.Tensor = torch.Tensor(np.load(mel_path))
+            mels: torch.Tensor = torch.Tensor(np.load(mel_path)).squeeze(0)
             mel_sum += mels.sum(dim=-1)
             mel_squared_sum += (mels ** 2).sum(dim=-1)
             counts += mels.shape[-1]

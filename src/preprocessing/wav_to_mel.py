@@ -6,6 +6,7 @@ import torch
 import torchaudio
 from librosa.filters import mel as librosa_mel
 from tqdm import tqdm
+import numpy as np
 
 # Using the same parameters as in HiFiGAN
 F_MIN = 0
@@ -66,14 +67,16 @@ def main(input_dir: Path, output_dir: Path, audio_ext: str) -> None:
     print("Transforming audio to mel...")
 
     for filepath in tqdm(filepath_list):
-        new_path = output_dir / filepath.stem
+        new_path = output_dir / filepath.parent.stem
+        new_path.mkdir(exist_ok=True, parents=True)
 
         wave_tensor, _ = torchaudio.load(filepath)
         assert wave_tensor.shape[0] == 1, "Audio has more than 1 channel"
 
         mels_tensor = mel_spectrogram(wave_tensor)  # [n_channels x n_mels x time]
-        torch.save(mels_tensor, new_path.with_suffix(".pkl"))
 
+        #torch.save(mels_tensor, new_path.with_suffix(".pkl"))
+        np.save((new_path / filepath.stem).with_suffix(".npy"), mels_tensor.squeeze(0).numpy())
     print("Finished successfully.")
     print(f"Processed files are located at {output_dir}")
 

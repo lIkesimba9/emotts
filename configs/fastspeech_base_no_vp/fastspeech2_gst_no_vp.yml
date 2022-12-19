@@ -19,18 +19,13 @@ checkpoint_name: fastspeech2_no_vp
 data:
   mels_dir: data/preprocessed/mels
   wav_dir: data/preprocessed/resampled
-  feature_dir: data/feature_output/fastspeech_base_no_vp
+  feature_dir: data/feature_output/fastspeech_base
   duration_dir: data/preprocessed/duration
   pitch_dir: data/preprocessed/pitch
   energy_dir: data/preprocessed/energy
-  phones_dir: data/preprocessed/phones
+  text_dir: data/preprocessed/mfa_outputs
   speaker_emb_dir: data/preprocessed/embeddings
-  ignore_speakers:
-    - "0011"
-    - "0012"
-    - "0013"
-    - "0014"
-    - "0020"
+  ignore_speakers: []
 pretrained_hifi: models/en/hifi
 base_model: checkpoints/fastspeech2_no_vp/fastspeech2/
 

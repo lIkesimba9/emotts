@@ -36,7 +36,7 @@ dependencies:
   - unzip=6.0
   - pyworld 
   - pip:
-    - Montreal-Forced-Aligner==2.0.6
+    - Montreal-Forced-Aligner==2.0.0b4
     - tgt==1.4.4
     - pypinyin
     - scikit-learn==1.0.2

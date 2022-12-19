@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple, Union
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import tgt
 from tqdm import tqdm
 from sklearn.preprocessing import StandardScaler
 
@@ -36,7 +37,7 @@ class FastSpeech2Sample:
 @dataclass
 class FastSpeech2Info:
 
-    phonemes_path: Path
+    text_path: Path
     mel_path: Path
     energy_path: Path
     duration_path: Path
@@ -127,18 +128,26 @@ class FastSpeech2Dataset(Dataset[FastSpeech2Sample]):
     def __getitem__(self, idx: int) -> FastSpeech2Sample:
 
         info = self._dataset[idx]
-        phoneme_collection = open(info.phonemes_path).read().split(" ")
+        text_grid = tgt.read_textgrid(info.text_path)
+        phones_tier = text_grid.get_tier_by_name(PHONES_TIER)
         phoneme_ids = [
-            self._phoneme_to_id[phoneme] for phoneme in phoneme_collection
+            self._phoneme_to_id[x.text] for x in phones_tier.get_copy_with_gaps_filled()
         ]
-
-        duration: np.array = np.around(np.load(info.duration_path))
+        durations: np.array = np.load(info.duration_path)
 
         mels: torch.Tensor = torch.Tensor(np.load(info.mel_path))
         mels = (mels - self.mels_mean) / self.mels_std
         
-        energy = self.normalize(np.load(info.energy_path), self.energy_mean, self.energy_std)
-        
+        pad_size = mels.shape[-1] - np.int64(durations.sum())
+        if pad_size < 0:
+            durations[-1] += pad_size
+            assert durations[-1] >= 0
+        if pad_size > 0:
+            phoneme_ids.append(self._phoneme_to_id[PAD_TOKEN])    
+
+        energy = np.load(info.energy_path)
+        nonzero_idxs = np.where(energy != 0)[0]
+        energy[nonzero_idxs] = np.log(energy[nonzero_idxs])
 
         pitch = np.load(info.pitch_path)
         nonzero_idxs = np.where(pitch != 0)[0]
@@ -151,7 +160,7 @@ class FastSpeech2Dataset(Dataset[FastSpeech2Sample]):
             num_phonemes=len(phoneme_ids),
             speaker_id=info.speaker_id,
             mel=mels,
-            duration=duration,
+            duration=durations,
             energy=energy,
             pitch=pitch,
             speaker_id_str=info.pitch_path.parent.name,
@@ -205,11 +214,11 @@ class FastSpeech2Factory:
         self.finetune = finetune
         self._mels_dir = Path(config.mels_dir)
         self._pitch_dir = Path(config.pitch_dir)
-        self._phones_dir = Path(config.phones_dir)
+        self._text_ext = config.text_ext
+        self._text_dir = Path(config.text_dir)
         self._energy_dir = Path(config.energy_dir)
         self._duration_dir = Path(config.duration_dir)
         self._fastspeech2_ext = config.fastspeech2_ext
-        self._phones_ext = config.phones_ext
         self.phoneme_to_id: Dict[str, int] = phonemes_to_id
         self.phoneme_to_id[PAD_TOKEN] = 0
         self.speaker_to_id: Dict[str, int] = speakers_to_id
@@ -227,14 +236,14 @@ class FastSpeech2Factory:
         self.energy_mean, self.energy_std = self._get_mean_and_std_scalar(self._energy_dir, self._fastspeech2_ext)
         self.energy_min, self.energy_max = self._get_min_max(self._energy_dir, self._fastspeech2_ext, self.energy_mean, self.energy_std)
         
-        self.energy_min = (self.energy_min - self.energy_mean) / self.energy_std
-        self.energy_max = (self.energy_max - self.energy_mean) / self.energy_std
+        #self.energy_min = (self.energy_min - self.energy_mean) / self.energy_std
+        #self.energy_max = (self.energy_max - self.energy_mean) / self.energy_std
         
         self.pitch_mean, self.pitch_std = self._get_mean_and_std_scalar(self._pitch_dir, self._fastspeech2_ext)
         self.pitch_min, self.pitch_max = self._get_min_max(self._pitch_dir, self._fastspeech2_ext, self.pitch_mean, self.pitch_std)
         
-        self.pitch_min = (self.pitch_min - self.pitch_mean) / self.pitch_std
-        self.pitch_max = (self.pitch_max - self.pitch_mean) / self.pitch_std
+        #self.pitch_min = (self.pitch_min - self.pitch_mean) / self.pitch_std
+        #self.pitch_max = (self.pitch_max - self.pitch_mean) / self.pitch_std
 
     @staticmethod
     def add_to_mapping(mapping: Dict[str, int], token: str) -> None:
@@ -317,11 +326,11 @@ class FastSpeech2Factory:
             Path(x.parent.name) / x.stem
             for x in self._duration_dir.rglob(f"*{self._fastspeech2_ext}")
         }
-        phones_set = {
+        texts_set = {
             Path(x.parent.name) / x.stem
-            for x in self._phones_dir.rglob(f"*{self._phones_ext}")
-        }           
-        samples = list(mels_set & duration_set & pitch_set & enegry_set & phones_set)
+            for x in self._text_dir.rglob(f"*{self._text_ext}")
+        }        
+        samples = list(mels_set & duration_set & pitch_set & enegry_set & texts_set)
         for sample in tqdm(samples):
             if sample.parent.name in REMOVE_SPEAKERS:
                 continue
@@ -330,21 +339,25 @@ class FastSpeech2Factory:
             energy_path = (self._energy_dir / sample).with_suffix(self._fastspeech2_ext)
             pitch_path = (self._pitch_dir / sample).with_suffix(self._fastspeech2_ext)
             duration_path = (self._duration_dir / sample).with_suffix(self._fastspeech2_ext)
-            phonemes_path = (self._phones_dir / sample).with_suffix(self._phones_ext)
-            self.add_to_mapping(self.speaker_to_id, sample.parent.name)
-            
-            speaker_id = self.speaker_to_id[sample.parent.name]
-            phonemes = open(phonemes_path).read().split(" ")
-            if len(phonemes) > 0:
+            tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
 
+            self.add_to_mapping(self.speaker_to_id, sample.parent.name)
+            text_grid = tgt.read_textgrid(tg_path)
+            speaker_id = self.speaker_to_id[sample.parent.name]
+            if PHONES_TIER in text_grid.get_tier_names():
+
+                phones_tier = text_grid.get_tier_by_name(PHONES_TIER)
+                phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
+                if "spn" in phonemes:
+                    continue
                 for phoneme in phonemes:
                     self.add_to_mapping(self.phoneme_to_id, phoneme)
 
                 if sample.parent.name in self.speaker_to_use:
                     dataset.append(
                         FastSpeech2Info(
+                            text_path=tg_path,
                             phonemes_length=len(phonemes),
-                            phonemes_path=phonemes_path,
                             energy_path=energy_path,
                             duration_path=duration_path,
                             pitch_path=pitch_path,
