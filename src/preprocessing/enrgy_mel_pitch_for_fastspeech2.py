@@ -34,38 +34,6 @@ SAMPLE_RATE = 22050
 FILTER_LENGTH = 1024
 
 
-def spectral_normalize_torch(magnitudes: torch.Tensor) -> torch.Tensor:
-    output = torch.log(torch.clamp(magnitudes, min=1e-5))
-    return output
-
-
-def mel_spectrogram(y: torch.Tensor,
-                    n_fft: int = N_FFT, num_mels: int = N_MELS,
-                    sample_rate: int = SAMPLE_RATE, hop_size: int = HOP_SIZE,
-                    win_size: int = WIN_SIZE, fmin: int = F_MIN, fmax: int = F_MAX,
-                    center: bool = False) -> torch.Tensor:
-
-    hann_window, mel_basis = {}, {}
-
-    if fmax not in mel_basis:
-        mel = librosa_mel(sample_rate, n_fft, num_mels, fmin, fmax)
-        mel_basis[f"{fmax}_{y.device}"] = torch.from_numpy(mel).float().to(y.device)
-        hann_window[f"{y.device}"] = torch.hann_window(win_size).to(y.device)
-
-    y = torch.nn.functional.pad(y.unsqueeze(1),
-                                (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
-                                mode="reflect")
-
-    spec = torch.stft(y.squeeze(1), n_fft, hop_length=hop_size,
-                      win_length=win_size, window=hann_window[str(y.device)],
-                      center=center, pad_mode="reflect",
-                      normalized=False, onesided=True)
-
-    spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-9)
-    spec = torch.matmul(mel_basis[f"{fmax}_{y.device}"], spec)
-    spec = spectral_normalize_torch(spec)
-
-    return spec
 
 
 
@@ -157,10 +125,10 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
     textgrid = tgt.io.read_textgrid(textgrid_path)
     durations = np.array(
         [
-            seconds_to_frame(x.duration())
+            int(seconds_to_frame(x.end_time) - seconds_to_frame(x.start_time))
             for x in textgrid.get_tier_by_name("phones").get_copy_with_gaps_filled()
         ],
-        dtype=np.float32,
+        dtype=np.int32,
     )
 
     # Read and trim wav filesmel_spec
@@ -173,21 +141,15 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
         frame_period=HOP_SIZE / SAMPLE_RATE * 1000,
     )
     pitch = pw.stonemask(wav.astype(np.float64), pitch, t, SAMPLE_RATE)
-
+    pitch = pitch[: sum(durations)]
     if np.sum(pitch != 0) <= 1:
         return None
 
     # Compute mel-scale spectrogram and energy
-    _, energy = Audio.tools.get_mel_from_wav(wav, stft)
-    
-    mels = mel_spectrogram(torch.Tensor(wav).unsqueeze(0))
-    energy = energy[: mels.shape[-1]]
-    pitch = pitch[: mels.shape[-1]]
+    mels, energy = Audio.tools.get_mel_from_wav(wav, stft)
+    mels = mels[:, : sum(durations)]   
+    energy = energy[: sum(durations)]
 
-    pad_size = mels.shape[-1] - np.int64(durations.sum())
-    if pad_size < 0:
-        durations[-1] += pad_size
-        assert durations[-1] >= 0
 
 
     pitch = _convert_to_continuous_f0(pitch)
@@ -197,31 +159,24 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
     pos = 0
     for i, d in enumerate(durations):
         if d > 0:
-            if len(pitch[pos : pos + np.round(d + 1).astype(np.int32)]) != 0:
-                pitch[i] = np.mean(pitch[pos : pos + np.round(d + 1).astype(np.int32)])
-            else:
-                pitch[i] = 0
+            pitch[i] = np.mean(pitch[pos : pos + d])
         else:
             pitch[i] = 0
-        pos += np.round(d).astype(np.int32)
+        pos += d
     pitch = pitch[: len(durations)]
 
     # Phoneme-level average
     pos = 0
     for i, d in enumerate(durations):
         if d > 0:
-            if len(energy[pos : pos + np.round(d + 1).astype(np.int32)]) != 0:
-                energy[i] = np.mean(energy[pos : pos + np.round(d + 1).astype(np.int32)])
-            else:
-                energy[i] = 0
+            energy[i] = np.mean(energy[pos : pos + np.round(d + 1).astype(np.int32)])
         else:
             energy[i] = 0
         pos += np.round(d).astype(np.int32)
     energy = energy[: len(durations)]
 
-    return durations, pitch, energy, mels.squeeze(0).numpy()
+    return durations, pitch, energy, mels
 
-    
 
 if __name__ == "__main__":
     main()
