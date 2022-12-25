@@ -9,7 +9,7 @@ seed: 42
 batch_size: 32
 grad_clip_thresh: 1.0
 log_steps: 1000
-iters_per_checkpoint: 100000
+iters_per_checkpoint: 50000
 total_iterations: 500001
 finetune: false
 test_size: 0.05
@@ -19,7 +19,7 @@ checkpoint_name: fastspeech2_no_vp
 data:
   mels_dir: data/preprocessed/mels
   wav_dir: data/preprocessed/resampled
-  feature_dir: data/feature_output/fastspeech_base
+  feature_dir: data/feature_output/fastspeech_base_no_vp
   duration_dir: data/preprocessed/duration
   pitch_dir: data/preprocessed/pitch
   energy_dir: data/preprocessed/energy
@@ -27,7 +27,7 @@ data:
   speaker_emb_dir: data/preprocessed/embeddings
   ignore_speakers: []
 pretrained_hifi: models/en/hifi
-base_model: checkpoints/fastspeech2_no_vp/fastspeech2/
+base_model: checkpoints/fastspeech2_no_vp/fastspeech2
 
 gst_config:
   ref_enc_filters:

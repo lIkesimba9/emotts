@@ -93,7 +93,7 @@ def english_cleaners(text: str) -> str:
     text = expand_numbers(text)
     text = expand_abbreviations(text)
     text = collapse_whitespace(text)
-    return text
+    return text.replace(",", "")
 
 
 def punctuation_to_whitespace(text: str) -> str:

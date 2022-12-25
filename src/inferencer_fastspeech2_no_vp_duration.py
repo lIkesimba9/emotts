@@ -30,9 +30,9 @@ from src.constants import (
     REMOVE_SPEAKERS
 )
 from src.data_process.fastspeech2_dataset import FastSpeech2Batch, FastSpeech2Collate, FastSpeech2Factory
-from src.models.fastspeech2.fastspeech2 import (
-    FastSpeech2,
-)
+
+from src.models.fastspeech2.fastspeech2_no_vp_no_va import FastSpeech2
+
 from src.train_config import load_config
 
 
@@ -138,8 +138,6 @@ class Inferencer:
                 (
                     mel_predictions,
                     postnet_mel_predictions,
-                    pitch_predictions,
-                    energy_predictions,
                     log_duration_predictions,
                     src_masks,
                     mel_masks,

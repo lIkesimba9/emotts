@@ -125,7 +125,7 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
     textgrid = tgt.io.read_textgrid(textgrid_path)
     durations = np.array(
         [
-            int(seconds_to_frame(x.end_time) - seconds_to_frame(x.start_time))
+            int(np.round(seconds_to_frame(x.end_time)) - np.round(seconds_to_frame(x.start_time)))
             for x in textgrid.get_tier_by_name("phones").get_copy_with_gaps_filled()
         ],
         dtype=np.int32,

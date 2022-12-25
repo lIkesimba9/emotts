@@ -1,6 +1,6 @@
 import argparse
 
-from src.inferencer_fastspeech2_corrected import Inferencer
+from src.inferencer_fastspeech2_corrected_no_vp_duration import Inferencer
 
 
 def main() -> None:
