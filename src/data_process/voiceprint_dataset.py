@@ -91,11 +91,8 @@ class VoicePrintDataset(Dataset[VoicePrintSample]):
         speaker_embs_tensor = torch.from_numpy(speaker_embs)
 
         pad_size = mels.shape[-1] - np.int64(durations.sum())
-        if pad_size < 0:
-            durations[-1] += pad_size
-            assert durations[-1] >= 0
-        if pad_size > 0:
-            phoneme_ids.append(self._phoneme_to_id[PAD_TOKEN])    
+        durations[-1] += pad_size
+        assert durations[-1] >= 0
 
         return VoicePrintSample(
             phonemes=phoneme_ids,

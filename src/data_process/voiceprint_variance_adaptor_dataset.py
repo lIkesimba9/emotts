@@ -109,11 +109,8 @@ class VoicePrintVarianceDataset(Dataset[VoicePrintVarianceSample]):
         mels = (mels - self.mels_mean) / self.mels_std
 
         pad_size = mels.shape[-1] - np.int64(durations.sum())
-        if pad_size < 0:
-            durations[-1] += pad_size
-            assert durations[-1] >= 0
-        if pad_size > 0:
-            phoneme_ids.append(self._phoneme_to_id[PAD_TOKEN])    
+        durations[-1] += pad_size
+        assert durations[-1] >= 0
         
         energy = np.load(info.energy_path)
         nonzero_idxs = np.where(energy != 0)[0]

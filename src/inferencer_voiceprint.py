@@ -119,7 +119,11 @@ class Inferencer:
             )
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
-            mels: torch.Tensor = torch.load(mels_path)
+            print(mels_path)
+            if (self._mels_ext == '.pth'):
+                mels: torch.Tensor = torch.load(mels_path)
+            else:
+                mels = torch.from_numpy(np.load(mels_path)).unsqueeze(0)
             mels = (mels - self.mels_mean) / self.mels_std
 
             pad_size = mels.shape[-1] - np.int64(durations.sum())

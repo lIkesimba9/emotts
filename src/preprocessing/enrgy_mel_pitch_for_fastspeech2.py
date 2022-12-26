@@ -147,7 +147,9 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
 
     # Compute mel-scale spectrogram and energy
     mels, energy = Audio.tools.get_mel_from_wav(wav, stft)
-    mels = mels[:, : sum(durations)]   
+    
+    mels = mels[:, : sum(durations)]
+
     energy = energy[: sum(durations)]
 
 
