@@ -197,6 +197,8 @@ class FastSpeech2VoicePrint(FastSpeech2):
             config.encoder_params.encoder_hidden,
         )
 
+        self.activation = nn.ReLU()
+
     def forward(self, batch: FastSpeech2VoicePrintBatch,
         p_control=1.0,
         e_control=1.0,
@@ -222,6 +224,8 @@ class FastSpeech2VoicePrint(FastSpeech2):
             output += gst_emb
 
         speaker_emb = self.voiceprint_emb(batch.speaker_embs)
+        speaker_emb = self.activation(speaker_emb)
+        
         output = output + speaker_emb.unsqueeze(1).expand(
             -1, max_phonemes_lenght, -1
         )
@@ -286,6 +290,7 @@ class FastSpeech2VoicePrint(FastSpeech2):
             output += gst_emb
         
         speaker_emb = self.voiceprint_emb(speaker_emb)
+        speaker_emb = self.activation(speaker_emb)
         output = output + speaker_emb.unsqueeze(1).expand(
             -1, max_phonemes_len, -1
         )
@@ -334,6 +339,7 @@ class FastSpeech2Dutaion(nn.Module):
             config.encoder_params.encoder_hidden,
             config.encoder_params.encoder_hidden,
         )
+        self.activation = nn.ReLU()
         
         self.decoder = Decoder(config.decoder_params, config.max_seq_len)
         
@@ -362,6 +368,7 @@ class FastSpeech2Dutaion(nn.Module):
         
         
         speaker_emb = self.voiceprint_emb(batch.speaker_embs)
+        speaker_emb = self.activation(speaker_emb)
         output = output + speaker_emb.unsqueeze(1).expand(
             -1, max_phonemes_lenght, -1
         )
@@ -403,6 +410,7 @@ class FastSpeech2Dutaion(nn.Module):
         )
         
         speaker_emb = self.voiceprint_emb(speaker_emb)
+        speaker_emb = self.activation(speaker_emb)
         #speaker_emb = self.voiceprint_emb(batch.speaker_embs)
         output = output + speaker_emb.unsqueeze(1).expand(
             -1, max_phonemes_len, -1
