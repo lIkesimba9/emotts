@@ -402,7 +402,8 @@ class FastSpeech2Dutaion(nn.Module):
             reference_mel.device
         )
         
-        speaker_emb = self.voiceprint_emb(batch.speaker_embs)
+        speaker_emb = self.voiceprint_emb(speaker_emb)
+        #speaker_emb = self.voiceprint_emb(batch.speaker_embs)
         output = output + speaker_emb.unsqueeze(1).expand(
             -1, max_phonemes_len, -1
         )
