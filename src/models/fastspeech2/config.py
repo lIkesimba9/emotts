@@ -1,5 +1,33 @@
 from dataclasses import dataclass, field
-from typing import List, Literal
+from typing import List, Literal, Optional
+
+@dataclass
+class DurationParams:
+
+    lstm_layers: int = field(default=2)
+    lstm_hidden: int = field(default=256)
+    dropout: float = field(default=0.5)
+
+
+@dataclass
+class RangeParams:
+
+    lstm_layers: int = field(default=2)
+    lstm_hidden: int = field(default=256)
+    dropout: float = field(default=0.5)
+
+
+
+@dataclass
+class GaussianUpsampleParams:
+
+    duration_config: DurationParams
+    range_config: RangeParams
+    eps: float = field(default=1e-6)
+    positional_dim: int = field(default=32)
+    teacher_forcing_ratio: float = field(default=1.0)
+    attention_dropout: float = field(default=0.1)
+    positional_dropout: float = field(default=0.0)
 
 
 
@@ -43,6 +71,7 @@ class VarianceEmbeddingParams:
 class VarianceAdaptorParams:
     predictor_params: VariancePredictorParams
     embedding_params: VarianceEmbeddingParams
+    attention_config: GaussianUpsampleParams#Optional[GaussianUpsampleParams]
 
 
 
