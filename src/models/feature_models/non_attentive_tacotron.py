@@ -331,77 +331,84 @@ class Decoder(nn.Module):
         )
 
     def forward(self, memory: torch.Tensor, y_mels: torch.Tensor) -> torch.Tensor:
-
+        ## memory == encoder outputs passed through attention for each decoder step
+        ## decoder_input_dim == attention_output_dim + prenet_output_dim
+        ## memory: [ batch_size, n_decoder_steps, attention_output_dim ] 
         batch_size = memory.shape[0]
         mels_view_size = self.n_mel_channels * self.n_frames_per_step
-        previous_frame = torch.zeros(memory.shape[0], 1, mels_view_size).to(
+        init_previous_frame = torch.zeros(batch_size, 1, mels_view_size).to(
             memory.device
         )
+        n_decoder_steps = memory.shape[1]
         padded_size = (
-            math.ceil(y_mels.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+            n_decoder_steps * mels_view_size
         )
+        ## NOTE: Right now the durations accumulated error leads 
+        ##          to the size of mels lagging behind the durations,
+        ##          so we need to extend the mels with zeros... (e.g. 38 vs 40 --> 6-frames difference)
+        ## TODO: move to float durations for Tacotron
+        padded_memory = memory
 
-        to_get = padded_size - self.n_frames_per_step
-        to_pad = padded_size - y_mels.shape[1]
-        padding = torch.zeros(batch_size, to_pad, memory.shape[2]).to(memory.device)
-        padded_memory = torch.cat([memory, padding], dim=1)
-        padded_y_mels = y_mels[:, :to_get, :].reshape(batch_size, -1, mels_view_size)
-        padded_y_mels = torch.cat((previous_frame, padded_y_mels), dim=1)
+        ## one decoder step less: to be fed as previous decoder step (in teacher forcing mode)
+        ## NOTE: once we move to previous frame being the size of one frame, this should be changed
+        to_get = int((padded_size - mels_view_size)/self.n_mel_channels)
+        ## NOTE: no padding here, because memory shape should exactly match the number of decoder steps
+        ##                                                                  and not the number of frames
+        padded_y_mels_previous = torch.zeros(y_mels.shape[0], to_get, y_mels.shape[2]).to(memory.device)
+        padded_y_mels_previous[:, :y_mels.shape[1], :] = y_mels
+        padded_y_mels_previous = padded_y_mels_previous.reshape(batch_size, -1, mels_view_size)
+        padded_y_mels_previous = torch.cat((init_previous_frame, padded_y_mels_previous), dim=1)
 
-        padded_memory = padded_memory.view(
-            batch_size, -1, memory.shape[2], self.n_frames_per_step
-        )
-        padded_memory = padded_memory.sum(dim=3)
-        previous_frame = previous_frame[:, 0, :]
+        ## NOTE: same. no reshaping here, because memory shape should exactly match the number of decoder steps
+        ##                                                                          and not the number of frames
+        init_previous_frame = init_previous_frame[:, 0, :]
 
         mel_outputs = []
         decoder_state = None
+        previous_frame = init_previous_frame
 
-        for i in range(padded_y_mels.shape[1]):
+        for j in range(n_decoder_steps):
             previous_frame = self.prenet(
                 previous_frame.view(batch_size, -1, self.n_mel_channels)
             )
             decoder_input: torch.Tensor = torch.cat(
-                (previous_frame.view(batch_size, -1), padded_memory[:, i, :]), dim=-1
+                (previous_frame.view(batch_size, -1), padded_memory[:, j, :]), dim=-1
             )
             out, decoder_state = self.decoder_rnn(
                 decoder_input.unsqueeze(1), decoder_state
             )
-            out = torch.cat((out, padded_memory[:, i, :].unsqueeze(1)), dim=-1)
+            out = torch.cat((out, padded_memory[:, j, :].unsqueeze(1)), dim=-1)
             mel_out = self.linear_projection(out)
             mel_outputs.append(mel_out)
             if random.uniform(0, 1) > self.teacher_forcing_ratio:
                 previous_frame = mel_out.squeeze(1)
             else:
-                previous_frame = padded_y_mels[:, i, :]
+                previous_frame = padded_y_mels_previous[:, j, :]
 
         mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
         mel_tensor_outputs = mel_tensor_outputs.reshape(
             batch_size, -1, self.n_mel_channels
         )
-        return mel_tensor_outputs[:, : y_mels.shape[1], :]
+        return mel_tensor_outputs
 
     def inference(self, memory: torch.Tensor) -> torch.Tensor:
 
         batch_size = memory.shape[0]
-        previous_frame = torch.zeros(
-            memory.shape[0], self.n_mel_channels * self.n_frames_per_step
+        mels_view_size = self.n_mel_channels * self.n_frames_per_step
+        init_previous_frame = torch.zeros(
+            memory.shape[0], mels_view_size
         ).to(memory.device)
+        n_decoder_steps = memory.shape[1]
         padded_size = (
-            math.ceil(memory.shape[1] / self.n_frames_per_step) * self.n_frames_per_step
+            n_decoder_steps * self.n_frames_per_step
         )
-        to_pad = padded_size - memory.shape[1]
-        padding = torch.zeros(batch_size, to_pad, memory.shape[2]).to(memory.device)
-        padded_memory = torch.cat([memory, padding], dim=1)
-        padded_memory = padded_memory.view(
-            batch_size, -1, memory.shape[2], self.n_frames_per_step
-        )
-        padded_memory = padded_memory.sum(dim=3)
+        padded_memory = memory
 
         mel_outputs = []
         decoder_state = None
+        previous_frame = init_previous_frame
 
-        for i in range(padded_memory.shape[1]):
+        for i in range(n_decoder_steps):
             previous_frame = self.prenet(
                 previous_frame.view(batch_size, -1, self.n_mel_channels)
             )
@@ -434,6 +441,8 @@ class NonAttentiveTacotron(nn.Module):
         finetune: bool,
     ):
         super().__init__()
+
+        self.n_frames_per_step = config.n_frames_per_step
 
         full_embedding_dim = (
             config.phonem_embedding_dim
@@ -505,7 +514,9 @@ class NonAttentiveTacotron(nn.Module):
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
-            batch.durations.cumsum(dim=1)[:, -1].long(), device=batch.phonemes.device
+            batch.durations.cumsum(dim=1)[:, -1].long()*self.n_frames_per_step, 
+            max_len = mel_outputs_postnet.shape[1],
+            device=batch.phonemes.device
         )
         mask = mask.unsqueeze(2)
         mel_outputs_postnet = mel_outputs_postnet * (1 - mask.float())
@@ -575,7 +586,9 @@ class NonAttentiveTacotronVoicePrint(NonAttentiveTacotron):
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
-            batch.durations.cumsum(dim=1)[:, -1].long(), device=batch.phonemes.device
+            batch.durations.cumsum(dim=1)[:, -1].long()*self.n_frames_per_step,
+            max_len = mel_outputs_postnet.shape[1],
+            device=batch.phonemes.device
         )
         mask = mask.unsqueeze(2)
         mel_outputs_postnet = mel_outputs_postnet * (1 - mask.float())
@@ -718,6 +731,8 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptor(nn.Module):
     ):
         super().__init__()
 
+        self.n_frames_per_step = config.n_frames_per_step
+
         full_embedding_dim = (
             config.phonem_embedding_dim
             + config.speaker_embedding_dim
@@ -804,7 +819,9 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptor(nn.Module):
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
-            batch.durations.cumsum(dim=1)[:, -1].long(), device=batch.phonemes.device
+            batch.durations.cumsum(dim=1)[:, -1].long()*self.n_frames_per_step,
+            max_len = mel_outputs_postnet.shape[1],
+            device=batch.phonemes.device
         )
         mask = mask.unsqueeze(2)
         mel_outputs_postnet = mel_outputs_postnet * (1 - mask.float())
@@ -872,6 +889,8 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         energy_max: float,
     ):
         super().__init__()
+
+        self.n_frames_per_step = config.n_frames_per_step
 
         full_embedding_dim = (
             config.phonem_embedding_dim
@@ -962,7 +981,9 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet.transpose(1, 2)
         mask = get_mask_from_lengths(
-            batch.durations.cumsum(dim=1)[:, -1].long(), device=batch.phonemes.device
+            batch.durations.cumsum(dim=1)[:, -1].long()*self.n_frames_per_step,
+            max_len = mel_outputs_postnet.shape[1],
+            device=batch.phonemes.device
         )
         mask = mask.unsqueeze(2)
         mel_outputs_postnet = mel_outputs_postnet * (1 - mask.float())

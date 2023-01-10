@@ -56,6 +56,7 @@ class VoicePrintDataset(Dataset[VoicePrintSample]):
         self,
         sample_rate: int,
         hop_size: int,
+        frames_per_step: int,
         mels_mean: torch.Tensor,
         mels_std: torch.Tensor,
         phoneme_to_ids: Dict[str, int],
@@ -66,6 +67,7 @@ class VoicePrintDataset(Dataset[VoicePrintSample]):
         self._dataset.sort(key=lambda x: x.phonemes_length)
         self.sample_rate = sample_rate
         self.hop_size = hop_size
+        self.frames_per_step = frames_per_step
         self.mels_mean = mels_mean
         self.mels_std = mels_std
 
@@ -81,8 +83,9 @@ class VoicePrintDataset(Dataset[VoicePrintSample]):
             self._phoneme_to_id[x.text] for x in phones_tier.get_copy_with_gaps_filled()
         ]
 
-
-        durations = np.load(info.duration_path)
+        ## loading number of frames
+        ## TODO: Best to change to number of seconds and float32 in later versions
+        durations_in_frames = np.load(info.duration_path)
 
         mels: torch.Tensor = torch.Tensor(np.load(info.mel_path)).unsqueeze(0)
         mels = (mels - self.mels_mean) / self.mels_std
@@ -90,9 +93,23 @@ class VoicePrintDataset(Dataset[VoicePrintSample]):
         speaker_embs: np.ndarray = np.load(str(info.speaker_path))
         speaker_embs_tensor = torch.from_numpy(speaker_embs)
 
-        pad_size = mels.shape[-1] - np.int64(durations.sum())
-        durations[-1] += pad_size
-        assert durations[-1] >= 0
+        pad_size = mels.shape[-1] - np.int64(durations_in_frames.sum())
+        durations_in_frames[-1] += pad_size
+        assert durations_in_frames[-1] >= 0
+
+        durations_in_steps = durations_in_frames
+        ## convert number of frames to number of decoder steps
+        if (self.frames_per_step > 1):
+            durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
+        durations_in_steps = durations_in_steps.astype(np.int32)
+
+        ## adjust mel length according to the number of decoder steps
+        ## NOTE: right now this adjustment also incorporates 
+        ##            the accumulated error due to rounding of seconds into frames at each step
+        ## TODO: get rid of conversion to int for Gaussian upsampling
+        output_mel_length = durations_in_steps.sum()*self.frames_per_step
+        r_dur_pad_size = output_mel_length - mels.shape[-1]
+        assert (not (r_dur_pad_size < 0))
 
         return VoicePrintSample(
             phonemes=phoneme_ids,
@@ -100,7 +117,7 @@ class VoicePrintDataset(Dataset[VoicePrintSample]):
             speaker_emb=speaker_embs_tensor,
             speaker_id=info.speaker_id,
             mels=mels,
-            durations=durations,
+            durations=durations_in_steps,
         )
 
 
@@ -113,6 +130,7 @@ class VoicePrintFactory:
         self,
         sample_rate: int,
         hop_size: int,
+        frames_per_step: int,
         n_mels: int,
         config: DatasetParams,
         phonemes_to_id: Dict[str, int],
@@ -122,6 +140,7 @@ class VoicePrintFactory:
     ):
         self.sample_rate = sample_rate
         self.hop_size = hop_size
+        self.frames_per_step = frames_per_step
         self.n_mels = n_mels
         self.finetune = finetune
         self._mels_dir = Path(config.mels_dir)
@@ -176,6 +195,7 @@ class VoicePrintFactory:
         train_dataset = VoicePrintDataset(
             sample_rate=self.sample_rate,
             hop_size=self.hop_size,
+            frames_per_step=self.frames_per_step,
             mels_mean=self.mels_mean,
             mels_std=self.mels_std,
             phoneme_to_ids=self.phoneme_to_id,
@@ -184,6 +204,7 @@ class VoicePrintFactory:
         test_dataset = VoicePrintDataset(
             sample_rate=self.sample_rate,
             hop_size=self.hop_size,
+            frames_per_step=self.frames_per_step,
             mels_mean=self.mels_mean,
             mels_std=self.mels_std,
             phoneme_to_ids=self.phoneme_to_id,
@@ -276,11 +297,11 @@ class VoicePrintFactory:
 
 class VoicePrintCollate:
     """
-    Zero-pads model inputs and targets based on number of frames per setep
+    Zero-pads model inputs and targets based on max length in the batch
     """
 
-    def __init__(self, n_frames_per_step: int = 1):
-        self.n_frames_per_step = n_frames_per_step
+    def __init__(self):
+        pass
 
     def __call__(self, batch: List[VoicePrintSample]) -> VoicePrintBatch:
         """Collate's training batch from normalized text and mel-spectrogram

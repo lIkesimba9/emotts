@@ -26,11 +26,12 @@ class NonAttentiveTacotronLoss(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         target_mels.requires_grad = False
         target_durations.requires_grad = False
-
-        prenet_l1 = F.l1_loss(prenet_mels, target_mels)
-        prenet_l2 = F.mse_loss(prenet_mels, target_mels)
-        postnet_l1 = F.l1_loss(postnet_mels, target_mels)
-        postnet_l2 = F.mse_loss(postnet_mels, target_mels)
+        target_mels_padded = torch.zeros(prenet_mels.shape, device = prenet_mels.device)
+        target_mels_padded[:, :target_mels.shape[1], :] = target_mels
+        prenet_l1 = F.l1_loss(prenet_mels, target_mels_padded)
+        prenet_l2 = F.mse_loss(prenet_mels, target_mels_padded)
+        postnet_l1 = F.l1_loss(postnet_mels, target_mels_padded)
+        postnet_l2 = F.mse_loss(postnet_mels, target_mels_padded)
         loss_prenet = self.mel_weight * (prenet_l1 + prenet_l2)
         loss_postnet = self.mel_weight * (postnet_l1 + postnet_l2)
         model_durations = model_durations * self.hop_size / self.sample_rate
@@ -60,11 +61,13 @@ class NonAttentiveTacotronVarianceAdaptorLoss(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         target_mels.requires_grad = False
         target_durations.requires_grad = False
+        target_mels_padded = torch.zeros(prenet_mels.shape, device = prenet_mels.device)
+        target_mels_padded[:, :target_mels.shape[1], :] = target_mels
 
-        prenet_l1 = F.l1_loss(prenet_mels, target_mels)
-        prenet_l2 = F.mse_loss(prenet_mels, target_mels)
-        postnet_l1 = F.l1_loss(postnet_mels, target_mels)
-        postnet_l2 = F.mse_loss(postnet_mels, target_mels)
+        prenet_l1 = F.l1_loss(prenet_mels, target_mels_padded)
+        prenet_l2 = F.mse_loss(prenet_mels, target_mels_padded)
+        postnet_l1 = F.l1_loss(postnet_mels, target_mels_padded)
+        postnet_l2 = F.mse_loss(postnet_mels, target_mels_padded)
         loss_prenet = self.mel_weight * (prenet_l1 + prenet_l2)
         loss_postnet = self.mel_weight * (postnet_l1 + postnet_l2)
         model_durations = model_durations * self.hop_size / self.sample_rate
