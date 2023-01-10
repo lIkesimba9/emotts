@@ -71,7 +71,7 @@ class VarianceEmbeddingParams:
 class VarianceAdaptorParams:
     predictor_params: VariancePredictorParams
     embedding_params: VarianceEmbeddingParams
-    attention_config: GaussianUpsampleParams#Optional[GaussianUpsampleParams]
+    attention_config: Optional[GaussianUpsampleParams]
 
 
 

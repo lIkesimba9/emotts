@@ -12,6 +12,7 @@ from src.data_process import RegularBatch
 from src.data_process.voiceprint_dataset import VoicePrintBatch
 from src.data_process.voiceprint_variance_adaptor_dataset import VoicePrintVarianceBatch
 
+
 from .config import (
     DecoderParams,
     DurationParams,
@@ -26,7 +27,7 @@ from .gst import GST
 from .layers import Conv1DNorm, LinearWithActivation, PositionalEncoding
 from .utils import get_mask_from_lengths, norm_emb_layer
 
-from src.models.fastspeech2.modules import VariancePredictor, VarianceAdaptorParams
+from src.models.fastspeech2.modules import VariancePredictor, VarianceAdaptorParams, LengthRegulator
 
 
 class Prenet(nn.Module):
@@ -225,6 +226,18 @@ class Attention(nn.Module):
         embeddings_per_duration = torch.matmul(scores.transpose(1, 2), embeddings)
         embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
         return embeddings_per_duration
+    
+    def inference_duration(
+        self, embeddings: torch.Tensor, input_lengths: torch.Tensor
+    ) -> torch.Tensor:
+
+        durations = self.duration_predictor(embeddings, input_lengths)
+        ranges = self.range_predictor(embeddings, durations, input_lengths)
+        scores = self.calc_scores(durations, ranges)
+
+        embeddings_per_duration = torch.matmul(scores.transpose(1, 2), embeddings)
+        embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
+        return embeddings_per_duration, durations.squeeze(2)
 
 
 class Encoder(nn.Module):
@@ -878,6 +891,7 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
             + config.speaker_embedding_dim
             + gst_config.emb_dim
         )
+        self.length_regulator = LengthRegulator()
         self.finetune = finetune
         self.gst_emb_dim = gst_config.emb_dim
         self.phonem_embedding = nn.Embedding(
@@ -952,8 +966,8 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         durations, attented_embeddings = self.attention(
             embeddings, batch.num_phonemes, batch.durations
         )
-        embedings_energy_pitch = torch.cat((embedding_energy, embedding_pitch), dim=-1).sum(dim=1).unsqueeze(1).repeat(1, attented_embeddings.shape[1], 1)
-
+        embedings_energy_pitch = torch.cat((embedding_energy, embedding_pitch), dim=-1)
+        embedings_energy_pitch, _ = self.length_regulator(embedings_energy_pitch, batch.durations, attented_embeddings.shape[1])
         attented_embeddings = torch.cat((attented_embeddings, embedings_energy_pitch), dim=-1)
         
         
@@ -1005,9 +1019,10 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         )
         
 
-        attented_embeddings = self.attention.inference(embeddings, text_lengths)
+        attented_embeddings, durations = self.attention.inference_duration(embeddings, text_lengths)
 
-        embedings_energy_pitch = torch.cat((embedding_energy, embedding_pitch), dim=-1).sum(dim=1).unsqueeze(1).repeat(1, attented_embeddings.shape[1], 1)
+        embedings_energy_pitch = torch.cat((embedding_energy, embedding_pitch), dim=-1)
+        embedings_energy_pitch, _ = self.length_regulator(embedings_energy_pitch, durations, attented_embeddings.shape[1])
         attented_embeddings = torch.cat((attented_embeddings, embedings_energy_pitch), dim=-1)
 
         mel_outputs = self.decoder.inference(attented_embeddings)
