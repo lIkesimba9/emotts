@@ -317,7 +317,7 @@ class Attention(nn.Module):
 
         embeddings_per_duration = torch.matmul(scores.transpose(1, 2), embeddings)
         embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
-        return embeddings_per_duration, durations
+        return embeddings_per_duration, durations.squeeze(2)
 
 
 
@@ -400,24 +400,21 @@ class VarianceAdaptorGaus(nn.Module):
         e_control=1.0,  
     ):
 
-
-        
+      
         pitch_prediction, pitch_embedding = self.get_pitch_embedding(
             x, pitch_target, src_mask, p_control
         )
-        x = x + pitch_embedding
 
         energy_prediction, energy_embedding = self.get_energy_embedding(
             x, energy_target, src_mask, e_control
         )
+        
+        x = x + pitch_embedding
         x = x + energy_embedding
         durations, attented_embeddings = self.attention(
             x, num_phonemes, duration_target
         )
-        #print(durations.shape)
-        #print(durations.shape)
-        #x, _ = self.length_regulator(x, duration_target, max_len)
-        #x = x + attented_embeddings
+
         
         log_duration_prediction = torch.log(durations + 1)
         return (
@@ -434,25 +431,16 @@ class VarianceAdaptorGaus(nn.Module):
         _, pitch_embedding = self.get_pitch_embedding(
             x, None, src_mask, p_control
         )
-        x = x + pitch_embedding
+
 
         _, energy_embedding = self.get_energy_embedding(
             x, None, src_mask, e_control
         )
+        x = x + pitch_embedding
         x = x + energy_embedding
         attented_embeddings, durations = self.attention.inference(x, num_phonemes.to("cpu"))
-
-        duration_rounded = torch.clamp(
-            durations,
-            min=0,
-        )
-        #print(duration_rounded.shape)
-        mel_lens = duration_rounded.squeeze(-1).sum(dim=-1).long()
-        #_, mel_len = self.length_regulator(x, duration_rounded, None)
-        #print(mel_len.shape, mel_len)
-        #print(mel_lens.shape)
-        #x = x + attented_embeddings
-        #print(mel_lens, mel_lens.shape)
+   
+        mel_lens = durations.sum(dim=-1).long()
         mel_mask = get_mask_from_lengths(mel_lens, torch.max(mel_lens).item(), mel_lens.device)
 
         return (
