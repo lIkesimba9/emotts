@@ -348,15 +348,18 @@ class Decoder(nn.Module):
         ##          so we need to extend the mels with zeros... (e.g. 38 vs 40 --> 6-frames difference)
         ## TODO: move to float durations for Tacotron
         padded_memory = memory
-
-        ## one decoder step less: to be fed as previous decoder step (in teacher forcing mode)
-        ## NOTE: once we move to previous frame being the size of one frame, this should be changed
-        to_get = int((padded_size - mels_view_size)/self.n_mel_channels)
-        ## NOTE: no padding here, because memory shape should exactly match the number of decoder steps
-        ##                                                                  and not the number of frames
-        padded_y_mels_previous = torch.zeros(y_mels.shape[0], to_get, y_mels.shape[2]).to(memory.device)
-        padded_y_mels_previous[:, :y_mels.shape[1], :] = y_mels
-        padded_y_mels_previous = padded_y_mels_previous.reshape(batch_size, -1, mels_view_size)
+        
+        if (self.n_frames_per_step > 1):
+            ## one decoder step less: to be fed as previous decoder step (in teacher forcing mode)
+            ## NOTE: once we move to previous frame being the size of one frame, this should be changed
+            to_get = int((padded_size - mels_view_size)/self.n_mel_channels)
+            ## NOTE: no padding here, because memory shape should exactly match the number of decoder steps
+            ##                                                                  and not the number of frames
+            padded_y_mels_previous = torch.zeros(y_mels.shape[0], to_get, y_mels.shape[2]).to(memory.device)
+            padded_y_mels_previous[:, :y_mels.shape[1], :] = y_mels
+            padded_y_mels_previous = padded_y_mels_previous.reshape(batch_size, -1, mels_view_size)
+        else:
+            padded_y_mels_previous = y_mels
         padded_y_mels_previous = torch.cat((init_previous_frame, padded_y_mels_previous), dim=1)
 
         ## NOTE: same. no reshaping here, because memory shape should exactly match the number of decoder steps
