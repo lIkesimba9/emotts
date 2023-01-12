@@ -386,7 +386,7 @@ class Decoder(nn.Module):
             if random.uniform(0, 1) > self.teacher_forcing_ratio:
                 previous_frame = mel_out.squeeze(1)
             else:
-                previous_frame = padded_y_mels_previous[:, j, :]
+                previous_frame = padded_y_mels_previous[:, min(j+1, padded_y_mels_previous.shape[1]-1), :]
 
         mel_tensor_outputs: torch.Tensor = torch.cat(mel_outputs, dim=1)
         mel_tensor_outputs = mel_tensor_outputs.reshape(
