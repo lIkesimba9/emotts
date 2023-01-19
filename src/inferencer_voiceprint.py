@@ -127,12 +127,13 @@ class Inferencer:
             mels = (mels - self.mels_mean) / self.mels_std
 
             pad_size = mels.shape[-1] - np.int64(durations.sum())
-            if pad_size < 0:
-                durations[-1] += pad_size
-                assert durations[-1] >= 0
-            if pad_size > 0:
-                phoneme_ids.append(self.phonemes_to_idx[self.PAD_TOKEN])
-                np.append(durations, pad_size)
+            ##if pad_size < 0:
+            ## NOTE: make this behaviour consistent with trainin-batch processing (see trainer files)
+            durations[-1] += pad_size
+            assert durations[-1] >= 0
+            ##if pad_size > 0:
+            ##    phoneme_ids.append(self.phonemes_to_idx[self.PAD_TOKEN])
+            ##    np.append(durations, pad_size)
 
             speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._speaker_emb_ext)
             speaker_emb_array = np.load(str(speaker_emb_path)).astype(np.float32)

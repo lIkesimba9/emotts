@@ -44,7 +44,6 @@ class Inferencer:
             self.feature_model.attention.eps = torch.Tensor([self.feature_model.attention.eps])
         self._mels_dir = Path(config.data.mels_dir)
         self._duration_dir = Path(config.data.duration_dir)
-        ##self._phonemes_dir = Path(config.data.phones_dir)
         self._text_dir = Path(config.data.text_dir)
         self._text_ext = config.data.text_ext
         self._energy_dir = Path(config.data.energy_dir)
@@ -144,7 +143,6 @@ class Inferencer:
             durations = np.load(duration_path)
             energy = np.load(energy_path)
             pitch = np.load(pitch_path)
-
             
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
             if (self._mels_ext == '.pth'):
@@ -154,14 +152,13 @@ class Inferencer:
             mels = (mels - self.mels_mean) / self.mels_std
 
             pad_size = mels.shape[-1] - np.int64(durations.sum())
-            if pad_size < 0:
-                durations[-1] += pad_size
-                assert durations[-1] >= 0
-            if pad_size > 0:
-                phoneme_ids.append(self.phonemes_to_idx[self.PAD_TOKEN])
-                durations = np.append(durations, pad_size)
-
-
+            ##if pad_size < 0:
+            ## NOTE: make this behaviour consistent with trainin-batch processing (see trainer files)
+            durations[-1] += pad_size
+            assert durations[-1] >= 0
+            ##if pad_size > 0:
+            ##    phoneme_ids.append(self.phonemes_to_idx[self.PAD_TOKEN])
+            ##    durations = np.append(durations, pad_size)
 
             speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._speaker_emb_ext)
             speaker_emb_array = np.load(str(speaker_emb_path)).astype(np.float32)
