@@ -46,8 +46,8 @@ class Inferencer:
             self.feature_model.attention.eps = torch.Tensor([self.feature_model.attention.eps])
         self._mels_dir = Path(config.data.mels_dir)
         self._duration_dir = Path(config.data.duration_dir)
-        self._phonemes_dir = Path(config.data.phones_dir)
-        self._phones_ext = config.data.phones_ext
+        self._text_dir = Path(config.data.text_dir)
+        self._text_ext = config.data.text_ext
         self._energy_dir = Path(config.data.energy_dir)
         self._pitch_dir = Path(config.data.pitch_dir)
         self._speaker_emb_dir = Path(config.data.speaker_emb_dir)
@@ -67,6 +67,10 @@ class Inferencer:
 
 
     def proceed_data(self) -> None:
+        texts_set = {
+                    Path(x.parent.name) / x.stem
+                    for x in self._text_dir.rglob(f"*{self._text_ext}")
+        }
         mels_set = {
             Path(x.parent.name) / x.stem
             for x in self._mels_dir.rglob(f"*{self._mels_ext}")
@@ -79,10 +83,6 @@ class Inferencer:
             Path(x.parent.name) / x.stem
             for x in self._duration_dir.rglob(f"*{self._mels_ext}")
         }
-        phones_set = {
-            Path(x.parent.name) / x.stem
-            for x in self._phonemes_dir.rglob(f"*{self._phones_ext}")
-        }
         enegry_set = {
             Path(x.parent.name) / x.stem
             for x in self._energy_dir.rglob(f"*{self._mels_ext}")
@@ -91,7 +91,7 @@ class Inferencer:
             Path(x.parent.name) / x.stem
             for x in self._pitch_dir.rglob(f"*{self._mels_ext}")
         }
-        samples = list(mels_set & duration_set & speaker_emb_set & phones_set & enegry_set & pitch_set)
+        samples = list(mels_set & duration_set & speaker_emb_set & texts_set & enegry_set & pitch_set)
         for sample in tqdm(samples):
             if sample.parent.name in REMOVE_SPEAKERS:
                 continue
@@ -107,15 +107,25 @@ class Inferencer:
                 continue
 
             duration_path = (self._duration_dir / sample).with_suffix(self._mels_ext)
-            phonemes_path = (self._phonemes_dir / sample).with_suffix(self._phones_ext)
+
+            tg_path = (self._text_dir / sample).with_suffix(self._text_ext)
+            text_grid = tgt.read_textgrid(tg_path)
+
+            phones_tier = text_grid.get_tier_by_name(self.PHONES_TIER)
+
+            phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
+
+            if self.LEXICON_OOV_TOKEN in phonemes:
+                continue
+
+            if self.PHONES_TIER not in text_grid.get_tier_names():
+                continue
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
             speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._speaker_emb_ext)
 
             energy_path = (self._energy_dir / sample).with_suffix(self._mels_ext)
             pitch_path = (self._pitch_dir / sample).with_suffix(self._mels_ext)
-
-            phonemes = open(phonemes_path).read().split(" ")
 
             if len(phonemes) == 0:
                 continue
@@ -136,7 +146,10 @@ class Inferencer:
             mels: torch.Tensor = torch.Tensor(np.load(mels_path)).unsqueeze(0)
             mels = (mels - self.mels_mean) / self.mels_std
 
-
+            pad_size = mels.shape[-1] - np.int64(durations.sum())
+            ## NOTE: make this behaviour consistent with trainin-batch processing (see trainer files)
+            durations[-1] += pad_size
+            assert durations[-1] >= 0
 
             speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._speaker_emb_ext)
             speaker_emb_array = np.load(str(speaker_emb_path)).astype(np.float32)
