@@ -38,6 +38,7 @@ class Inferencer:
             self.speakers_to_idx: Dict[str, int] = json.load(f)
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
+        self.frames_per_step = config.model.n_frames_per_step
         self.device = torch.device(config.device)
         self.feature_model: NonAttentiveTacotronVoicePrintVarianceAdaptor = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
@@ -139,21 +140,37 @@ class Inferencer:
             for phoneme in phonemes:
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
-            durations = np.load(duration_path)
+	    durations_in_frames = np.array(
+                [
+                    int(np.round(self.seconds_to_frame(x.end_time)) - np.round(self.seconds_to_frame(x.start_time)))
+                    for x in phones_tier.get_copy_with_gaps_filled()
+                ],
+                dtype=np.float32
+            )
             energy = np.load(energy_path)
             pitch = np.load(pitch_path)
 
             mels: torch.Tensor = torch.Tensor(np.load(mels_path)).unsqueeze(0)
             mels = (mels - self.mels_mean) / self.mels_std
 
-            pad_size = mels.shape[-1] - np.int64(durations.sum())
+            pad_size = mels.shape[-1] - np.int64(durations_in_frames.sum())
             ## NOTE: make this behaviour consistent with trainin-batch processing (see trainer files)
-            durations[-1] += pad_size
-            assert durations[-1] >= 0
+            durations_in_frames[-1] += pad_size
+            assert durations_in_frames[-1] >= 0
+
+            durations_in_steps = durations_in_frames
+            ## convert number of frames to number of decoder steps
+            if (self.frames_per_step > 1):
+                durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
+            durations_in_steps = durations_in_steps.astype(np.int32)
 
             speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._speaker_emb_ext)
             speaker_emb_array = np.load(str(speaker_emb_path)).astype(np.float32)
             speaker_emb_tensor = torch.from_numpy(speaker_emb_array).unsqueeze(0)
+
+            output_mel_length = durations_in_steps.sum()*self.frames_per_step
+            r_dur_pad_size = output_mel_length - mels.shape[-1]
+            assert (not (r_dur_pad_size < 0))
 
             with torch.no_grad():
                 batch = VoicePrintVarianceBatch(
@@ -161,7 +178,7 @@ class Inferencer:
                     num_phonemes=torch.LongTensor([len(phoneme_ids)]),
                     speaker_ids=torch.LongTensor([speaker_id]).to(self.device),
                     speaker_embs=speaker_emb_tensor.to(self.device),
-                    durations=torch.FloatTensor([durations]).to(self.device),
+                    durations=torch.FloatTensor([durations_in_steps]).to(self.device),
                     mels=mels.permute(0, 2, 1).float().to(self.device),
                     energies=torch.FloatTensor([energy]).to(self.device),
                     pitches=torch.FloatTensor([pitch]).to(self.device),
