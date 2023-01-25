@@ -7,6 +7,7 @@ import torchaudio
 from librosa.filters import mel as librosa_mel
 from tqdm import tqdm
 from typing import List, Tuple
+import math
 
 import tgt
 import librosa
@@ -58,6 +59,9 @@ def _convert_to_continuous_f0(f0: np.array) -> np.array:
     
     return f0
 
+TYPE_INT = "int"
+TYPE_FLOAT = "float"
+DURATION_TYPES = [TYPE_INT, TYPE_FLOAT]
 
 @click.command()
 @click.option("--input-audio-dir", type=Path, required=True,
@@ -68,7 +72,10 @@ def _convert_to_continuous_f0(f0: np.array) -> np.array:
               help="Directory for mels, energy, pitch.")#data/processed/esd/english/fastspeech2
 @click.option("--audio-ext", type=str, default="flac", required=True,
               help="Extension of audio files.")
-def main(input_audio_dir: Path, input_textgrid_dir: Path, output_dir: Path, audio_ext: str) -> None:
+@click.option("--duration-type", type=str, default="int", required=False,
+              help="one of int or float.")
+def main(input_audio_dir: Path, input_textgrid_dir: Path, output_dir: Path, audio_ext: str, 
+         duration_type: str) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)
 
     stft = Audio.stft.TacotronSTFT(
@@ -89,7 +96,7 @@ def main(input_audio_dir: Path, input_textgrid_dir: Path, output_dir: Path, audi
 
     for tg_path in tqdm(textgrid_collection):
         audio_path = input_audio_dir / Path(tg_path.parent.stem) /  Path(tg_path.stem + f".{audio_ext}")
-        output = process_utterance(audio_path, tg_path, stft)
+        output = process_utterance(audio_path, tg_path, stft, duration_type)
         if output == None:
             continue
         duration, pitch, energy, mels = output
@@ -120,16 +127,32 @@ def seconds_to_frame(seconds: float) -> float:
     return seconds * SAMPLE_RATE / HOP_SIZE
 
 def process_utterance(audio_path: Path, textgrid_path: Path,
-    stft: Audio.stft.TacotronSTFT
+    stft: Audio.stft.TacotronSTFT,
+    duration_type: str
 ) -> Tuple[List, List, List, List]:
     textgrid = tgt.io.read_textgrid(textgrid_path)
-    durations = np.array(
-        [
-            int(np.round(seconds_to_frame(x.end_time)) - np.round(seconds_to_frame(x.start_time)))
-            for x in textgrid.get_tier_by_name("phones").get_copy_with_gaps_filled()
-        ],
-        dtype=np.int32,
-    )
+
+    durations = None
+    int_durations = np.array(
+            [
+                int(np.round(seconds_to_frame(x.end_time)) - np.round(seconds_to_frame(x.start_time)))
+                for x in textgrid.get_tier_by_name("phones").get_copy_with_gaps_filled()
+            ],
+            dtype=np.int32,
+        )
+    float_durations = np.array(
+            [
+                seconds_to_frame(x.end_time) - seconds_to_frame(x.start_time)
+                for x in textgrid.get_tier_by_name("phones").get_copy_with_gaps_filled()
+            ],
+            dtype=np.float32,
+        )
+    if duration_type == TYPE_INT:
+        durations = int_durations
+    elif duration_type == TYPE_FLOAT:
+        durations = float_durations
+    else:
+        raise ValueError("Unknown value for duration_type")
 
     # Read and trim wav filesmel_spec
     wav, _ = librosa.load(audio_path)
@@ -141,16 +164,16 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
         frame_period=HOP_SIZE / SAMPLE_RATE * 1000,
     )
     pitch = pw.stonemask(wav.astype(np.float64), pitch, t, SAMPLE_RATE)
-    pitch = pitch[: sum(durations)]
+    pitch = pitch[: math.ceil(sum(durations))]
     if np.sum(pitch != 0) <= 1:
         return None
 
     # Compute mel-scale spectrogram and energy
     mels, energy = Audio.tools.get_mel_from_wav(wav, stft)
     
-    mels = mels[:, : sum(durations)]
+    mels = mels[:, : math.ceil(sum(durations))]
 
-    energy = energy[: sum(durations)]
+    energy = energy[: math.ceil(sum(durations))]
 
 
 
@@ -159,23 +182,23 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
 
     # Phoneme-level average
     pos = 0
-    for i, d in enumerate(durations):
+    for i, d in enumerate(int_durations):
         if d > 0:
             pitch[i] = np.mean(pitch[pos : pos + d])
         else:
             pitch[i] = 0
         pos += d
-    pitch = pitch[: len(durations)]
+    pitch = pitch[: len(int_durations)]
 
     # Phoneme-level average
     pos = 0
-    for i, d in enumerate(durations):
+    for i, d in enumerate(int_durations):
         if d > 0:
             energy[i] = np.mean(energy[pos : pos + np.round(d + 1).astype(np.int32)])
         else:
             energy[i] = 0
         pos += np.round(d).astype(np.int32)
-    energy = energy[: len(durations)]
+    energy = energy[: len(int_durations)]
 
     return durations, pitch, energy, mels
 
