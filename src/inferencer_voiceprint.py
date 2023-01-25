@@ -113,7 +113,7 @@ class Inferencer:
 
             durations_in_frames = np.array(
                 [
-                    int(np.round(seconds_to_frame(x.end_time)) - np.round(seconds_to_frame(x.start_time)))
+                    int(np.round(self.seconds_to_frame(x.end_time)) - np.round(self.seconds_to_frame(x.start_time)))
                     for x in phones_tier.get_copy_with_gaps_filled()
                 ],
                 dtype=np.float32
@@ -162,5 +162,6 @@ class Inferencer:
                 _, output, _, _ = self.feature_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
                 output = output * self.mels_std.to(self.device) + self.mels_mean.to(self.device)
+                ## NOTE: here the generated size of mels may be bigger than the true mels because of n_frames_per_step and rounding
 
             torch.save(output.float(), filepath)

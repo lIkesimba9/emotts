@@ -66,6 +66,9 @@ class Inferencer:
                 if speaker not in config.data.finetune_speakers
             ]
 
+    def seconds_to_frame(self, seconds: float) -> float:
+        return seconds * self.sample_rate / self.hop_size
+
 
     def proceed_data(self) -> None:
         texts_set = {
@@ -140,7 +143,7 @@ class Inferencer:
             for phoneme in phonemes:
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
-	    durations_in_frames = np.array(
+            durations_in_frames = np.array(
                 [
                     int(np.round(self.seconds_to_frame(x.end_time)) - np.round(self.seconds_to_frame(x.start_time)))
                     for x in phones_tier.get_copy_with_gaps_filled()
