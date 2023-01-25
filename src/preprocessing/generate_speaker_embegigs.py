@@ -337,8 +337,7 @@ def main(input_dir: Path, output_dir: Path, audio_ext: str, model_path: Path) ->
 
     for filepath in tqdm(filepath_list):
         
-        file_name = filepath.name
-        dir_name = file_name.split("_")[0]
+        dir_name = filepath.parent.name
         dir_path = output_dir / dir_name
         dir_path.mkdir(exist_ok=True)
         new_path = dir_path / filepath.stem

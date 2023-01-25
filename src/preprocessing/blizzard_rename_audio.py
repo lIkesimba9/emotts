@@ -13,10 +13,11 @@ from tqdm import tqdm
 def main(input_dir: Path, output_dir: Path) -> None:
     files_total = 0
     for dir_path in tqdm(input_dir.iterdir()):
-        new_dir_path = output_dir / dir_path.name
-        new_dir_path.mkdir(exist_ok=True, parents=True)
         for filepath in dir_path.iterdir():
-            copy(str(filepath), new_dir_path / filepath.name.replace("-", '_'))
+            charter_id = filepath.name.split('-')[0]
+            new_dir_path = (output_dir / (dir_path.name + "_" + charter_id))
+            new_dir_path.mkdir(exist_ok=True, parents=True)
+            copy(str(filepath), new_dir_path / (dir_path.name + "_" + filepath.name.replace("-", '_')))
             files_total += 1
 
     print(f"{files_total} files were copied to {output_dir}")
