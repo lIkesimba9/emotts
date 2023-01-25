@@ -352,11 +352,15 @@ class Decoder(nn.Module):
         if (self.n_frames_per_step > 1):
             ## one decoder step less: to be fed as previous decoder step (in teacher forcing mode)
             ## NOTE: once we move to previous frame being the size of one frame, this should be changed
-            to_get = int((padded_size - mels_view_size)/self.n_mel_channels)
+            to_get = (n_decoder_steps-1)*self.n_frames_per_step ##int((padded_size - mels_view_size)/self.n_mel_channels)
             ## NOTE: no padding here, because memory shape should exactly match the number of decoder steps
             ##                                                                  and not the number of frames
             padded_y_mels_previous = torch.zeros(y_mels.shape[0], to_get, y_mels.shape[2]).to(memory.device)
+            ##print(to_get, y_mels.shape)
+            ##if (padded_y_mels_previous.shape[1] > y_mels.shape[1]):
             padded_y_mels_previous[:, :y_mels.shape[1], :] = y_mels
+            ##else:
+            ##    padded_y_mels_previous = y_mels[:, :padded_y_mels_previous.shape[1]] ## need to investigate
             padded_y_mels_previous = padded_y_mels_previous.reshape(batch_size, -1, mels_view_size)
         else:
             padded_y_mels_previous = y_mels
