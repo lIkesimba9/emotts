@@ -41,7 +41,8 @@ class Inferencer:
     PAD_TOKEN = "<PAD>"
     PHONES_TIER = "phones"
     LEXICON_OOV_TOKEN = "spn"
-    MEL_EXT = "pth"
+    #MEL_EXT = "pth"
+    MEL_EXT = "npy"
 
     def __init__(
         self, config_path: str
@@ -94,13 +95,14 @@ class Inferencer:
                     num_phonemes=torch.LongTensor(np.array([sample.num_phonemes])).to(self.device),
                     mels_lens=torch.LongTensor(np.array([sample.mel.shape[1]])).to(self.device),
                     mels= sample.mel.unsqueeze(0).permute(0, 2, 1).float().to(self.device),
-                    energies=torch.LongTensor(np.array([sample.energy])).to(self.device),
-                    pitches=torch.LongTensor(np.array([sample.pitch])).to(self.device),
-                    durations=torch.LongTensor(np.array([sample.duration])).to(self.device),
-                    speaker_embs=torch.LongTensor(np.array(sample.speaker_emb)).unsqueeze(0).to(self.device),
+                    energies=torch.Tensor(np.array([sample.energy])).to(self.device),
+                    pitches=torch.Tensor(np.array([sample.pitch])).to(self.device),
+                    durations=torch.Tensor(np.array([sample.duration])).to(self.device),
+                    speaker_embs=sample.speaker_emb.unsqueeze(0).to(self.device),
                 )
                 _, output, *_ = self.fastspeech2_model(batch)
                 output = output.permute(0, 2, 1).squeeze(0)
                 output = output * self.mels_std.to(self.device) + self.mels_mean.to(self.device)
 
-            torch.save(output.float(), filepath)
+            #torch.save(output.float(), filepath)
+            np.save(filepath, output.float().cpu().detach().numpy())

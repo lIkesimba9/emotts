@@ -1,6 +1,6 @@
 import argparse
 
-from src.inferencer_fastspeech2_corrected import Inferencer
+from src.inferencer_fastspeech2 import Inferencer
 
 
 def main() -> None:

@@ -18,7 +18,7 @@ lang: english
 checkpoint_name: fastspeech2_tune
 data:
   mels_dir: data/preprocessed/mels
-  wav_dir: data/preprocessed/resampled
+  wav_dir: data/preprocessed/resampled_16
   feature_dir: data/feature_output/fastspeech_base
   duration_dir: data/preprocessed/duration
   pitch_dir: data/preprocessed/pitch

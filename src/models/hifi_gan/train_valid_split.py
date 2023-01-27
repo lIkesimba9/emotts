@@ -5,7 +5,7 @@ from typing import List
 from src.data_process.config import DatasetParams
 
 
-def get_mel_file_path(full_wav_name: str, mels_dir: str, suffix: str = ".pth"):
+def get_mel_file_path(full_wav_name: str, mels_dir: str, suffix: str = ".npy"):
     return Path(
         mels_dir, Path(*list(Path(full_wav_name).parts[-2:])).with_suffix(suffix)
     )
@@ -16,7 +16,7 @@ def split_vctk_data(data_config: DatasetParams, test_fraction: float):
     mels_dir_path = Path(data_config.feature_dir)
 
     audio_set = {x.stem for x in wavs_dir_path.rglob("*wav")}
-    mels_set = {x.stem for x in mels_dir_path.rglob("*pth")}
+    mels_set = {x.stem for x in mels_dir_path.rglob("*npy")}
     samples = list(mels_set & audio_set)
 
     speakers_to_data_id = {
@@ -38,4 +38,5 @@ def split_vctk_data(data_config: DatasetParams, test_fraction: float):
             else:
                 train_data.append(file.as_posix())
 
+    print("len(train_data), len(test_data) = ", len(train_data), len(test_data))
     return train_data, test_data

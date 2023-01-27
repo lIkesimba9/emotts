@@ -191,7 +191,9 @@ class MelDataset(
         else:
 
             filename = get_mel_file_path(filename, self.base_mels_path)
-            mel = torch.load(filename, map_location="cpu")
+            #mel = torch.load(filename, map_location="cpu")
+            mel = np.load(filename)
+            mel = torch.from_numpy(mel)
 
             if len(mel.shape) < 3:
                 mel = mel.unsqueeze(0)
