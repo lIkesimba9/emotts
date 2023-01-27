@@ -12,6 +12,7 @@ from tqdm import tqdm
 from sklearn.preprocessing import StandardScaler
 
 from src.data_process.config import DatasetParams
+from src.data_process.audio_utils import seconds_to_frame
 from src.constants import REMOVE_SPEAKERS
 
 NUMBER = Union[int, float]
@@ -64,6 +65,7 @@ class VoicePrintVarianceDataset(Dataset[VoicePrintVarianceSample]):
         sample_rate: int,
         hop_size: int,
         frames_per_step: int,
+        duration_type: str,
         mels_mean: torch.Tensor,
         mels_std: torch.Tensor,
         energy_mean: float,
@@ -83,6 +85,7 @@ class VoicePrintVarianceDataset(Dataset[VoicePrintVarianceSample]):
         self.sample_rate = sample_rate
         self.hop_size = hop_size
         self.frames_per_step = frames_per_step
+        self.duration_type = duration_type
         self.mels_mean = mels_mean
         self.mels_std = mels_std
         self.energy_mean = energy_mean
@@ -107,7 +110,27 @@ class VoicePrintVarianceDataset(Dataset[VoicePrintVarianceSample]):
         ]
         ## loading number of frames
         ## TODO: Best to change to number of seconds and float32 in later versions
-        durations_in_frames = np.load(info.duration_path)
+        ##durations_in_frames = np.load(info.duration_path)
+        if (self.duration_type == "int"):
+                durations_in_frames = np.array(
+                        [
+                                int(np.round(seconds_to_frame(x.end_time, 
+                                    self.sample_rate, self.hop_size))) - int(np.round(seconds_to_frame(x.start_time, self.sample_rate, self.hop_size)))
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+        elif (self.duration_type == "float"):
+                durations_in_frames = np.array(
+                        [
+                                seconds_to_frame(x.end_time, self.sample_rate, self.hop_size) - seconds_to_frame(x.start_time, self.sample_rate, self.hop_size)
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+        else:
+                raise ValueError("Unknown value for duration_type: " + self.duration_type)
+
 
         mels: torch.Tensor = torch.Tensor(np.load(info.mel_path)).unsqueeze(0)
         mels = (mels - self.mels_mean) / self.mels_std
@@ -118,12 +141,16 @@ class VoicePrintVarianceDataset(Dataset[VoicePrintVarianceSample]):
 
         durations_in_steps = durations_in_frames
         ## convert number of frames to number of decoder steps
-        if (self.frames_per_step > 1):
-            durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
-        durations_in_steps = durations_in_steps.astype(np.int32)
+        if (self.duration_type == "int"):
+            if (self.frames_per_step > 1):
+                durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
+            durations_in_steps = durations_in_steps.astype(np.int32)
+        elif (self.duration_type == "float"):
+            if (self.frames_per_step > 1):
+                durations_in_steps = durations_in_frames.astype('float32')/self.frames_per_step
 
         ## adjust mel length according to the number of decoder steps
-        output_mel_length = durations_in_steps.sum()*self.frames_per_step
+        output_mel_length = np.ceil(durations_in_steps.sum()*self.frames_per_step)
         r_pad_size = output_mel_length - mels.shape[-1]
         assert (not (r_pad_size < 0))
         
@@ -160,6 +187,7 @@ class VoicePrintVarianceFactory:
         sample_rate: int,
         hop_size: int,
         frames_per_step: int,
+        duration_type: str,
         n_mels: int,
         config: DatasetParams,
         phonemes_to_id: Dict[str, int],
@@ -170,6 +198,7 @@ class VoicePrintVarianceFactory:
         self.sample_rate = sample_rate
         self.hop_size = hop_size
         self.frames_per_step = frames_per_step
+        self.duration_type = duration_type
         self.n_mels = n_mels
         self.finetune = finetune
         self._mels_dir = Path(config.mels_dir)
@@ -245,6 +274,7 @@ class VoicePrintVarianceFactory:
             sample_rate=self.sample_rate,
             hop_size=self.hop_size,
             frames_per_step=self.frames_per_step,
+            duration_type=self.duration_type,
             mels_mean=self.mels_mean,
             mels_std=self.mels_std,
             phoneme_to_ids=self.phoneme_to_id,
@@ -262,6 +292,7 @@ class VoicePrintVarianceFactory:
             sample_rate=self.sample_rate,
             hop_size=self.hop_size,
             frames_per_step=self.frames_per_step,
+            duration_type=self.duration_type,
             mels_mean=self.mels_mean,
             mels_std=self.mels_std,
             phoneme_to_ids=self.phoneme_to_id,

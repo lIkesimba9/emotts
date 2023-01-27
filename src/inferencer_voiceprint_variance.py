@@ -13,6 +13,7 @@ from src.constants import (
     SPEAKERS_FILENAME,
 )
 from src.data_process.voiceprint_variance_adaptor_dataset import VoicePrintVarianceBatch
+from src.data_process.audio_utils import seconds_to_frame
 from src.models.feature_models.non_attentive_tacotron import (
     NonAttentiveTacotronVoicePrintVarianceAdaptor,
 )
@@ -39,6 +40,7 @@ class Inferencer:
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
         self.frames_per_step = config.model.n_frames_per_step
+        self.duration_type = config.model.attention_config.duration_config.duration_type
         self.device = torch.device(config.device)
         self.feature_model: NonAttentiveTacotronVoicePrintVarianceAdaptor = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
@@ -66,8 +68,8 @@ class Inferencer:
                 if speaker not in config.data.finetune_speakers
             ]
 
-    def seconds_to_frame(self, seconds: float) -> float:
-        return seconds * self.sample_rate / self.hop_size
+##    def seconds_to_frame(self, seconds: float) -> float:
+##        return seconds * self.sample_rate / self.hop_size
 
 
     def proceed_data(self) -> None:
@@ -143,13 +145,18 @@ class Inferencer:
             for phoneme in phonemes:
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
-            durations_in_frames = np.array(
-                [
-                    int(np.round(self.seconds_to_frame(x.end_time)) - np.round(self.seconds_to_frame(x.start_time)))
-                    for x in phones_tier.get_copy_with_gaps_filled()
-                ],
-                dtype=np.float32
-            )
+            if (self.duration_type == "int"):
+                durations_in_frames = np.array(
+                    [
+                        int(np.round(seconds_to_frame(x.end_time), self.sample_rate / self.hop_size)) - 
+                        int(np.round(seconds_to_frame(x.start_time), self.sample_rate / self.hop_size))
+                        for x in phones_tier.get_copy_with_gaps_filled()
+                    ],
+                    dtype=np.float32
+                )
+            else:
+                raise NotImplementedError("duration type float or other not yet implemented")
+
             energy = np.load(energy_path)
             pitch = np.load(pitch_path)
 

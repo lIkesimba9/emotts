@@ -10,12 +10,12 @@ batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
 iters_per_checkpoint: 30000
-total_iterations: 500001
-finetune: false
+total_iterations: 300001
+finetune: true
 test_size: 0.05
 device: cuda:0
 lang: english
-checkpoint_name: nat_inflated
+checkpoint_name: nat_inflated_tune
 data:
   mels_dir: data/preprocessed/mels
   wav_dir: data/preprocessed/resampled
@@ -139,7 +139,6 @@ model:
       lstm_layers: 2
       lstm_hidden: 256
       dropout: 0.5
-      duration_type: "int"
     range_config:
       lstm_layers: 2
       lstm_hidden: 256

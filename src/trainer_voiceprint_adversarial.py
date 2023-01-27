@@ -263,6 +263,7 @@ class Trainer:
             sample_rate=self.config.sample_rate,
             hop_size=self.config.hop_size,
             frames_per_step=self.config.model.n_frames_per_step,
+            duration_type=self.config.model.attention_config.duration_config.duration_type,
             n_mels=self.config.n_mels,
             config=self.config.data,
             phonemes_to_id=self.phonemes_to_id,

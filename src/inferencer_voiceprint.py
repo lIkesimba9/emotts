@@ -13,6 +13,7 @@ from src.constants import (
     SPEAKERS_FILENAME,
 )
 from src.data_process.voiceprint_dataset import VoicePrintBatch
+from src.data_process.audio_utils import seconds_to_frame
 from src.models.feature_models.non_attentive_tacotron import (
     NonAttentiveTacotronVoicePrint,
 )
@@ -63,8 +64,8 @@ class Inferencer:
                 if speaker not in config.data.finetune_speakers
             ]
 
-    def seconds_to_frame(self, seconds: float) -> float:
-        return seconds * self.sample_rate / self.hop_size
+##    def seconds_to_frame(self, seconds: float) -> float:
+##        return seconds * self.sample_rate / self.hop_size
 
     def proceed_data(self) -> None:
         texts_set = {
@@ -111,9 +112,10 @@ class Inferencer:
             for phoneme in phonemes:
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
+            raise NotImplementedError("duration type: choice between int an float")
             durations_in_frames = np.array(
                 [
-                    int(np.round(self.seconds_to_frame(x.end_time)) - np.round(self.seconds_to_frame(x.start_time)))
+                    int(np.round(seconds_to_frame(x.end_time), self.sample_rate, self.hop_size)) - int(np.round(seconds_to_frame(x.start_time, self.sample_rate, self.hop_size)))
                     for x in phones_tier.get_copy_with_gaps_filled()
                 ],
                 dtype=np.float32

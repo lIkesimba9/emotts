@@ -13,6 +13,7 @@ from src.constants import (
     SPEAKERS_FILENAME,
 )
 from src.data_process.voiceprint_variance_adaptor_dataset import VoicePrintVarianceBatch
+from src.data_process.audio_utils import seconds_to_frame
 from src.models.feature_models.non_attentive_tacotron import NonAttentiveTacotronVoicePrintVarianceAdaptorU
 from src.train_config import load_config
 
@@ -143,7 +144,7 @@ class Inferencer:
 
 	    durations_in_frames = np.array(
                 [
-                    int(np.round(self.seconds_to_frame(x.end_time)) - np.round(self.seconds_to_frame(x.start_time)))
+                    int(np.round(seconds_to_frame(x.end_time))) - int(np.round(seconds_to_frame(x.start_time)))
                     for x in phones_tier.get_copy_with_gaps_filled()
                 ],
                 dtype=np.float32

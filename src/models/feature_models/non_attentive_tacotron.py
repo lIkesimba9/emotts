@@ -182,7 +182,7 @@ class Attention(nn.Module):
     ) -> torch.Tensor:
         # Calc gaussian weight for Gaussian upsampling attention
         duration_cumsum = durations.cumsum(dim=1).float()
-        max_duration = duration_cumsum[:, -1, :].max().long()
+        max_duration = torch.ceil(duration_cumsum[:, -1, :].max()).long()
         mu = duration_cumsum - 0.5 * durations
         ranges = torch.maximum(ranges, self.eps.to(ranges.device))
         distr = Normal(mu, ranges)
@@ -346,7 +346,6 @@ class Decoder(nn.Module):
         ## NOTE: Right now the durations accumulated error leads 
         ##          to the size of mels lagging behind the durations,
         ##          so we need to extend the mels with zeros... (e.g. 38 vs 40 --> 6-frames difference)
-        ## TODO: move to float durations for Tacotron
         padded_memory = memory
         
         if (self.n_frames_per_step > 1):
@@ -356,11 +355,12 @@ class Decoder(nn.Module):
             ## NOTE: no padding here, because memory shape should exactly match the number of decoder steps
             ##                                                                  and not the number of frames
             padded_y_mels_previous = torch.zeros(y_mels.shape[0], to_get, y_mels.shape[2]).to(memory.device)
-            ##print(to_get, y_mels.shape)
-            ##if (padded_y_mels_previous.shape[1] > y_mels.shape[1]):
-            padded_y_mels_previous[:, :y_mels.shape[1], :] = y_mels
-            ##else:
-            ##    padded_y_mels_previous = y_mels[:, :padded_y_mels_previous.shape[1]] ## need to investigate
+            if (padded_y_mels_previous.shape[1] > y_mels.shape[1]):
+                padded_y_mels_previous[:, :y_mels.shape[1], :] = y_mels
+            else:
+                ## y_mels is not padded here, which is why padded_y_mels_previous may be shorter than y_mels,
+                ## since it may be the result of rounding down to the previous multiple of n_frames_per_step
+                padded_y_mels_previous = y_mels[:, :padded_y_mels_previous.shape[1]] 
             padded_y_mels_previous = padded_y_mels_previous.reshape(batch_size, -1, mels_view_size)
         else:
             padded_y_mels_previous = y_mels

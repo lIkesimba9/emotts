@@ -23,6 +23,7 @@ import numpy as np
 from tqdm import tqdm
 
 import audio as Audio
+from src.data_process.audio_utils import seconds_to_frame
 
 # Using the same parameters as in HiFiGAN
 F_MIN = 0
@@ -123,8 +124,8 @@ def main(input_audio_dir: Path, input_textgrid_dir: Path, output_dir: Path, audi
     print("Finished successfully.")
     print(f"Processed files are located at {output_dir}")
 
-def seconds_to_frame(seconds: float) -> float:
-    return seconds * SAMPLE_RATE / HOP_SIZE
+##def seconds_to_frame(seconds: float) -> float:
+##    return seconds * SAMPLE_RATE / HOP_SIZE
 
 def process_utterance(audio_path: Path, textgrid_path: Path,
     stft: Audio.stft.TacotronSTFT,
@@ -135,14 +136,15 @@ def process_utterance(audio_path: Path, textgrid_path: Path,
     durations = None
     int_durations = np.array(
             [
-                int(np.round(seconds_to_frame(x.end_time)) - np.round(seconds_to_frame(x.start_time)))
+                int(np.round(seconds_to_frame(x.end_time, SAMPLE_RATE, HOP_SIZE))) - 
+                int(np.round(seconds_to_frame(x.start_time, SAMPLE_RATE, HOP_SIZE)))
                 for x in textgrid.get_tier_by_name("phones").get_copy_with_gaps_filled()
             ],
             dtype=np.int32,
         )
     float_durations = np.array(
             [
-                seconds_to_frame(x.end_time) - seconds_to_frame(x.start_time)
+                seconds_to_frame(x.end_time, SAMPLE_RATE, HOP_SIZE) - seconds_to_frame(x.start_time, SAMPLE_RATE, HOP_SIZE)
                 for x in textgrid.get_tier_by_name("phones").get_copy_with_gaps_filled()
             ],
             dtype=np.float32,

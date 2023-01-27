@@ -8,6 +8,7 @@ class DurationParams:
     lstm_layers: int = field(default=2)
     lstm_hidden: int = field(default=256)
     dropout: float = field(default=0.5)
+    duration_type: str = field(default="int")
 
 
 @dataclass
