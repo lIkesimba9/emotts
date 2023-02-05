@@ -11,12 +11,11 @@ from .modules import VarianceAdaptor, LengthRegulator, VariancePredictor, Varian
 from .utils import get_mask_from_lengths
 from typing import List, Tuple
 
-from src.data_process.fastspeech2_dataset import FastSpeech2Batch
+from src.data_process.basic_dataset import BasicBatch
 from src.models.feature_models.gst import GST
 from src.models.feature_models.config import GSTParams
 from .config import FastSpeech2Params, VarianceAdaptorParams
 
-from src.data_process.fastspeech2_dataset_voiceprint import FastSpeech2VoicePrintBatch
 
 
 class FastSpeech2(nn.Module):
@@ -53,7 +52,7 @@ class FastSpeech2(nn.Module):
             config.encoder_params.encoder_hidden,
         )
 
-    def forward(self, batch: FastSpeech2Batch,
+    def forward(self, batch: BasicBatch,
         p_control=1.0,
         e_control=1.0,
         d_control=1.0,
@@ -198,7 +197,7 @@ class FastSpeech2VoicePrint(FastSpeech2):
         )
 
 
-    def forward(self, batch: FastSpeech2VoicePrintBatch,
+    def forward(self, batch: BasicBatch,
         p_control=1.0,
         e_control=1.0,
         d_control=1.0,
@@ -347,7 +346,7 @@ class FastSpeech2Dutaion(nn.Module):
 
 
 
-    def forward(self, batch: FastSpeech2VoicePrintBatch):
+    def forward(self, batch: BasicBatch):
         max_phonemes_lenght = torch.max(batch.num_phonemes).item()
         max_mels_lenght = torch.max(batch.mels_lens).item()
         src_masks = get_mask_from_lengths(batch.num_phonemes, max_phonemes_lenght, batch.phonemes.device)
@@ -477,7 +476,7 @@ class FastSpeech2Gaus(FastSpeech2):
         )
 
 
-    def forward(self, batch: FastSpeech2VoicePrintBatch,
+    def forward(self, batch: BasicBatch,
         p_control=1.0,
         e_control=1.0,
         d_control=1.0,

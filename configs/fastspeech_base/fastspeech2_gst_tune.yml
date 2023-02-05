@@ -17,6 +17,8 @@ device: cuda:0
 lang: english
 checkpoint_name: fastspeech2_tune
 data:
+  dataset_name: emo_dataset
+  context_lenght: 0
   mels_dir: data/preprocessed/mels
   wav_dir: data/preprocessed/resampled_16
   feature_dir: data/feature_output/fastspeech_base
@@ -25,7 +27,10 @@ data:
   energy_dir: data/preprocessed/energy
   text_dir: data/preprocessed/mfa_outputs
   speaker_emb_dir: data/preprocessed/embeddings
-  ignore_speakers: []
+  ignore_speakers:
+    - p280
+    - p315
+    - 0019
 pretrained_hifi: models/en/hifi
 base_model: checkpoints/fastspeech2/fastspeech2
 

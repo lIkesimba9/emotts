@@ -25,12 +25,11 @@ from src.constants import (
     SPEAKERS_FILENAME,
     SPEAKER_PRINT_DIR,
 )
-from src.data_process.voiceprint_dataset import (
-    VoicePrintBatch,
-    VoicePrintCollate,
-    VoicePrintFactory,
+from src.data_process.basic_dataset import (
+    BasicBatch,
+    BasicCollate,
 )
-from src.models.feature_models import (
+from src.models.feature_models.non_attentive_tacotron import (
     NonAttentiveTacotronVoicePrint,
 )
 from src.models.feature_models.loss_function import NonAttentiveTacotronLoss
@@ -58,7 +57,7 @@ class ReversalModel(nn.Module):
         self.reversal_layer = GradReverse()
         self.discriminator = discriminator
 
-    def forward(self, batch: VoicePrintBatch):
+    def forward(self, batch: BasicBatch):
         (
             durations,
             mel_outputs_postnet,

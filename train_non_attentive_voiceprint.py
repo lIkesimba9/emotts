@@ -1,7 +1,6 @@
 import argparse
 
 from src.trainer_voiceprint_adversarial import Trainer as TrainerAdv
-from src.trainer_voiceprint_reversal import Trainer as TrainerRes
 from src.train_config import load_config
 
 
@@ -12,10 +11,8 @@ def main() -> None:
     )
     args = parser.parse_args()
     config = load_config(args.config)
-    if config.loss.is_reversal:
-        trainer = TrainerRes(config)
-    else:
-        trainer = TrainerAdv(config)
+
+    trainer = TrainerAdv(config)
     trainer.train()
 
 

@@ -8,9 +8,7 @@ from torch.distributions import Normal
 from torch.nn import functional as f
 import numpy as np
 
-from src.data_process import RegularBatch
-from src.data_process.voiceprint_dataset import VoicePrintBatch
-from src.data_process.voiceprint_variance_adaptor_dataset import VoicePrintVarianceBatch
+from src.data_process.basic_dataset import BasicBatch
 
 
 from .config import (
@@ -490,7 +488,7 @@ class NonAttentiveTacotron(nn.Module):
         )
 
     def forward(
-        self, batch: RegularBatch
+        self, batch: BasicBatch
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)
@@ -562,13 +560,13 @@ class NonAttentiveTacotron(nn.Module):
 class NonAttentiveTacotronVoicePrint(NonAttentiveTacotron):
 
     def forward(
-        self, batch: VoicePrintBatch
+        self, batch: BasicBatch
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)
         speaker_emb: torch.Tensor = batch.speaker_embs.unsqueeze(1)
 
-        phonem_emb = self.encoder(phonem_emb, batch.num_phonemes)
+        phonem_emb = self.encoder(phonem_emb, batch.num_phonemes.to("cpu"))
         if self.finetune:
             gst_emb = self.gst(batch.mels)
         else:
@@ -779,7 +777,7 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptor(nn.Module):
         )
 
     def forward(
-        self, batch: VoicePrintVarianceBatch
+        self, batch: BasicBatch
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)
@@ -935,7 +933,7 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         )
 
     def forward(
-        self, batch: VoicePrintVarianceBatch
+        self, batch: BasicBatch
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         phonem_emb = self.phonem_embedding(batch.phonemes).transpose(1, 2)

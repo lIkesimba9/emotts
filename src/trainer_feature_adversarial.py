@@ -22,9 +22,13 @@ from src.constants import (
     PHONEMES_FILENAME,
     REFERENCE_PATH,
     SPEAKERS_FILENAME,
+    TEST_FILENAME,
+    TRAIN_FILENAME,
+    STATISTIC_FILENAME,
+    DATASET_INFO_PATH
 )
-from src.data_process import RegularBatch, RegularCollate, RegularFactory
-from src.models.feature_models import NonAttentiveTacotron
+from src.data_process.basic_dataset import BasicBatch, BasicCollate, BasicDataset
+from src.models.feature_models.non_attentive_tacotron import NonAttentiveTacotron
 from src.models.feature_models.loss_function import NonAttentiveTacotronLoss
 from src.models.hifi_gan.models import Generator, load_model as load_hifi
 from src.train_config import TrainParams
@@ -46,9 +50,8 @@ class Trainer:
         self.checkpoint_path = (
             CHECKPOINT_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         )
-        mapping_folder = (
-            base_model_path if self.config.finetune else self.checkpoint_path
-        )
+        self.data_info_dir = Path(DATASET_INFO_PATH) / Path(config.data.dataset_name)
+        self.data_info_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir = LOG_DIR / self.config.checkpoint_name / FEATURE_CHECKPOINT_NAME
         self.references = list( (REFERENCE_PATH / Path(self.config.lang)).rglob("*.pkl"))
 
@@ -60,7 +63,7 @@ class Trainer:
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         self.iteration_step = 1
-        self.upload_mapping(mapping_folder)
+        self.upload_mapping(self.data_info_dir)
         self.train_loader, self.valid_loader = self.prepare_loaders()
 
         self.mels_mean = self.train_loader.dataset.mels_mean
@@ -82,8 +85,6 @@ class Trainer:
             self.feature_model.finetune = self.config.finetune
             self.feature_model.encoder.requires_grad_(False)
             self.feature_model.phonem_embedding.requires_grad_(False)
-            self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
-            self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
 
         self.discriminator = nn.Sequential(
             nn.Linear(self.config.gst_config.emb_dim, len(self.speakers_to_id)),
@@ -131,13 +132,17 @@ class Trainer:
 
         self.upload_checkpoints()
 
-    def batch_to_device(self, batch: RegularBatch) -> RegularBatch:
-        batch_on_device = RegularBatch(
-            phonemes=batch.phonemes.to(self.device).detach(),
-            num_phonemes=batch.num_phonemes.detach(),
+    def batch_to_device(self, batch: BasicBatch) -> BasicBatch:
+        batch_on_device = BasicBatch(
             speaker_ids=batch.speaker_ids.to(self.device).detach(),
-            durations=batch.durations.to(self.device).detach(),
+            phonemes=batch.phonemes.to(self.device).detach(),
+            num_phonemes=batch.num_phonemes.to(self.device).detach(),
             mels=batch.mels.to(self.device).detach(),
+            mels_lens=batch.mels_lens.to(self.device).detach(),
+            energies=batch.energies.to(self.device).detach(),
+            pitches=batch.pitches.to(self.device).detach(),
+            durations=batch.durations.to(self.device).detach(),
+            speaker_embs=batch.speaker_embs.to(self.device).detach(),
         )
         return batch_on_device
 
@@ -184,6 +189,13 @@ class Trainer:
                 self.speakers_to_id.update(json.load(f))
             with open(mapping_folder / PHONEMES_FILENAME) as f:
                 self.phonemes_to_id.update(json.load(f))
+
+            with open(mapping_folder / STATISTIC_FILENAME) as f:
+                self.statistic_dict = json.load(f)
+            
+            self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
+            self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
+            
 
     def upload_checkpoints(self) -> None:
         if self.checkpoint_is_exist():
@@ -246,37 +258,54 @@ class Trainer:
         )
         torch.save(self.mels_std, self.checkpoint_path / MELS_STD_FILENAME)
 
-    def prepare_loaders(self) -> Tuple[DataLoader[RegularBatch], DataLoader[RegularBatch]]:
+    def prepare_loaders(self) -> Tuple[DataLoader[BasicBatch], DataLoader[BasicBatch]]:
 
-        factory = RegularFactory(
+ 
+        
+        train_dataset = BasicDataset(
             sample_rate=self.config.sample_rate,
             hop_size=self.config.hop_size,
-            n_mels=self.config.n_mels,
-            config=self.config.data,
-            phonemes_to_id=self.phonemes_to_id,
-            speakers_to_id=self.speakers_to_id,
-            ignore_speakers=self.config.data.ignore_speakers,
-            finetune=self.config.finetune,
+            mels_mean=self.mels_mean,
+            mels_std=self.mels_std,
+            statistic_dict=self.statistic_dict,
+            energy_min=self.energy_min, 
+            energy_max=self.energy_max,
+            pitch_min=self.pitch_min, 
+            pitch_max=self.pitch_max,
+            phoneme_to_ids=self.phonemes_to_id,
+            path_to_train_json=self.data_info_dir / TRAIN_FILENAME,
         )
-        self.phonemes_to_id = factory.phoneme_to_id
-        self.speakers_to_id = factory.speaker_to_id
-        trainset, valset = factory.split_train_valid(self.config.test_size)
-        collate_fn = RegularCollate()
+        test_dataset = BasicDataset(
+            sample_rate=self.config.sample_rate,
+            hop_size=self.config.hop_size,
+            mels_mean=self.mels_mean,
+            mels_std=self.mels_std,
+            statistic_dict=self.statistic_dict,
+            energy_min=self.energy_min, 
+            energy_max=self.energy_max,
+            pitch_min=self.pitch_min, 
+            pitch_max=self.pitch_max,
+            phoneme_to_ids=self.phonemes_to_id,
+            path_to_train_json=self.data_info_dir / TEST_FILENAME,
+        )
+
+        collate_fn = BasicCollate()
 
         train_loader = DataLoader(
-            trainset,
+            train_dataset,
             shuffle=False,
             batch_size=self.config.batch_size,
             collate_fn=collate_fn,
         )
         val_loader = DataLoader(
-            valset,
+            test_dataset,
             shuffle=False,
             batch_size=self.config.batch_size,
             collate_fn=collate_fn,
         )
 
         return train_loader, val_loader  # type: ignore
+
 
     def write_losses(
         self,
@@ -296,7 +325,7 @@ class Trainer:
         return audio
 
     def calc_adv_loss(
-        self, style_emb: torch.Tensor, batch: RegularBatch
+        self, style_emb: torch.Tensor, batch: BasicBatch
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         log_model = torch.log(1 - self.discriminator(style_emb))
         loss_model: torch.Tensor = (

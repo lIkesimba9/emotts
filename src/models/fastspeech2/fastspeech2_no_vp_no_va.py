@@ -11,7 +11,7 @@ from .modules import VarianceAdaptorDurationOnly, LengthRegulator, VariancePredi
 from .utils import get_mask_from_lengths
 from typing import List, Tuple
 
-from src.data_process.fastspeech2_dataset import FastSpeech2Batch
+from src.data_process.basic_dataset import BasicBatch
 from src.models.feature_models.gst import GST
 from src.models.feature_models.config import GSTParams
 from .config import FastSpeech2Params, VarianceAdaptorParams
@@ -53,7 +53,7 @@ class FastSpeech2(nn.Module):
             config.encoder_params.encoder_hidden,
         )
 
-    def forward(self, batch: FastSpeech2Batch,
+    def forward(self, batch: BasicBatch,
         p_control=1.0,
         e_control=1.0,
         d_control=1.0,
