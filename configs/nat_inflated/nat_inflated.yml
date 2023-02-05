@@ -9,7 +9,7 @@ seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
-iters_per_checkpoint: 30000
+iters_per_checkpoint: 2000
 total_iterations: 500001
 finetune: false
 test_size: 0.05
@@ -17,6 +17,8 @@ device: cuda:0
 lang: english
 checkpoint_name: nat_inflated
 data:
+  dataset_name: neutral_dataset
+  context_lenght: 0
   mels_dir: data/preprocessed/mels
   wav_dir: data/preprocessed/resampled
   feature_dir: data/feature_output/nat_inflated
@@ -25,7 +27,10 @@ data:
   energy_dir: data/preprocessed/energy
   text_dir: data/preprocessed/mfa_outputs
   speaker_emb_dir: data/preprocessed/embeddings
-  ignore_speakers: []
+  ignore_speakers:
+    - p280
+    - p315
+    - 0019
 pretrained_hifi: models/en/hifi
 base_model: checkpoints/nat_inflated/feature
 

@@ -141,6 +141,8 @@ generated_hifi/
 logs/
 data/
 !data/reference_wavs.csv
+data_info
+!data_info/.gitkeep
 checkpoints/
 cp_hifigan/
 ft_dataset/
