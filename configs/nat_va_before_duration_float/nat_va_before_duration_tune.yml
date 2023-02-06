@@ -15,16 +15,17 @@ finetune: true
 test_size: 0.05
 device: cuda:0
 lang: english
-checkpoint_name: nat_va_before_duration_f_tune
+checkpoint_name: nat_va_before_duration_f_tune_emo_only
 data:
-  mels_dir: data/Jan25_preprocessed/mels
-  wav_dir: data/Jan25_preprocessed/resampled
-  feature_dir: data/feature_output/nat_va_before_duration_f_tune
-  duration_dir: data/Jan25_preprocessed/duration
-  pitch_dir: data/Jan25_preprocessed/pitch
-  energy_dir: data/Jan25_preprocessed/energy
-  text_dir: data/Jan25_preprocessed/mfa_outputs
-  speaker_emb_dir: data/Jan25_preprocessed/embeddings
+  mels_dir: data/Jan25_preprocessed_emo_only/mels
+  mels_ext: ".npy"
+  wav_dir: data/Jan25_preprocessed_emo_only/resampled
+  feature_dir: data/feature_output/nat_va_before_duration_f_tune_emo_only
+  duration_dir: data/Jan25_preprocessed_emo_only/duration
+  pitch_dir: data/Jan25_preprocessed_emo_only/pitch
+  energy_dir: data/Jan25_preprocessed_emo_only/energy
+  text_dir: data/Jan25_preprocessed_emo_only/mfa_outputs
+  speaker_emb_dir: data/Jan25_preprocessed_emo_only/embeddings
   ignore_speakers: []
 pretrained_hifi: models/en/hifi
 base_model: checkpoints/nat_va_before_duration_f/feature
