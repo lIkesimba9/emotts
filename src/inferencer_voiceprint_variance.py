@@ -147,15 +147,27 @@ class Inferencer:
 
             if (self.duration_type == "int"):
                 durations_in_frames = np.array(
-                    [
-                        int(np.round(seconds_to_frame(x.end_time), self.sample_rate / self.hop_size)) - 
-                        int(np.round(seconds_to_frame(x.start_time), self.sample_rate / self.hop_size))
-                        for x in phones_tier.get_copy_with_gaps_filled()
-                    ],
-                    dtype=np.float32
+                        [
+                                int(np.round(seconds_to_frame(x.end_time,
+                                    self.sample_rate, self.hop_size))) - int(np.round(seconds_to_frame(x.start_time, 
+                                    self.sample_rate, self.hop_size)))
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+            elif (self.duration_type == "float"):
+                durations_in_frames = np.array(
+                        [
+                                seconds_to_frame(x.end_time,
+                                    self.sample_rate, self.hop_size) - seconds_to_frame(x.start_time, 
+                                    self.sample_rate, self.hop_size)
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
                 )
             else:
-                raise NotImplementedError("duration type float or other not yet implemented")
+                raise ValueError("Unknown value for duration_type: " + self.duration_type)
+
 
             energy = np.load(energy_path)
             pitch = np.load(pitch_path)
@@ -170,9 +182,14 @@ class Inferencer:
 
             durations_in_steps = durations_in_frames
             ## convert number of frames to number of decoder steps
-            if (self.frames_per_step > 1):
-                durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
-            durations_in_steps = durations_in_steps.astype(np.int32)
+            if (self.duration_type == "int"):
+                if (self.frames_per_step > 1):
+                    durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
+                durations_in_steps = durations_in_steps.astype(np.int32)
+            elif (self.duration_type == "float"):
+                if (self.frames_per_step > 1):
+                    durations_in_steps = durations_in_frames.astype('float32')/self.frames_per_step
+
 
             speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._speaker_emb_ext)
             speaker_emb_array = np.load(str(speaker_emb_path)).astype(np.float32)

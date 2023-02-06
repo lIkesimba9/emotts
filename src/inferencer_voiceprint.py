@@ -40,6 +40,7 @@ class Inferencer:
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
         self.frames_per_step = config.model.n_frames_per_step
+        self.duration_type = config.model.attention_config.duration_config.duration_type
         self.device = torch.device(config.device)
         self.feature_model: NonAttentiveTacotronVoicePrint = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
@@ -112,14 +113,28 @@ class Inferencer:
             for phoneme in phonemes:
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
-            raise NotImplementedError("duration type: choice between int an float")
-            durations_in_frames = np.array(
-                [
-                    int(np.round(seconds_to_frame(x.end_time), self.sample_rate, self.hop_size)) - int(np.round(seconds_to_frame(x.start_time, self.sample_rate, self.hop_size)))
-                    for x in phones_tier.get_copy_with_gaps_filled()
-                ],
-                dtype=np.float32
-            )
+            if (self.duration_type == "int"):
+                durations_in_frames = np.array(
+                        [
+                                int(np.round(seconds_to_frame(x.end_time,
+                                    self.sample_rate, self.hop_size))) - int(np.round(seconds_to_frame(x.start_time, self.sample_rate
+, self.hop_size)))
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+            elif (self.duration_type == "float"):
+                durations_in_frames = np.array(
+                        [
+                                seconds_to_frame(x.end_time,
+                                    self.sample_rate, self.hop_size) - seconds_to_frame(x.start_time, self.sample_rate, self.hop_size
+)
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+            else:
+                raise ValueError("Unknown value for duration_type: " + self.duration_type)
 
             mels_path = (self._mels_dir / sample).with_suffix(self._mels_ext)
             print(mels_path)
@@ -140,9 +155,13 @@ class Inferencer:
 
             durations_in_steps = durations_in_frames
             ## convert number of frames to number of decoder steps
-            if (self.frames_per_step > 1):
-                durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
-            durations_in_steps = durations_in_steps.astype(np.int32)
+            if (self.duration_type == "int"):
+                if (self.frames_per_step > 1):
+                    durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
+                durations_in_steps = durations_in_steps.astype(np.int32)
+            elif (self.duration_type == "float"):
+                if (self.frames_per_step > 1):
+                    durations_in_steps = durations_in_frames.astype('float32')/self.frames_per_step
 
             output_mel_length = durations_in_steps.sum()*self.frames_per_step
             r_dur_pad_size = output_mel_length - mels.shape[-1]
