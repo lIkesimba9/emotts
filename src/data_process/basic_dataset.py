@@ -55,6 +55,8 @@ class BasicDataset(Dataset[BasicSample]):
         pitch_max: float,
         phoneme_to_ids: Dict[str, int],
         path_to_train_json: Path,
+        pitch_norm: bool,
+        energy_norm: bool,
     ):
         self._phoneme_to_id = phoneme_to_ids
         self._dataset = load_json(path_to_train_json)
@@ -67,7 +69,9 @@ class BasicDataset(Dataset[BasicSample]):
         self.energy_min = energy_min
         self.energy_max = energy_max
         self.pitch_min = pitch_min 
-        self.pitch_max = pitch_max    
+        self.pitch_max = pitch_max
+        self.pitch_norm = pitch_norm
+        self.energy_norm = energy_norm
 
 
     def __len__(self) -> int:
@@ -103,10 +107,11 @@ class BasicDataset(Dataset[BasicSample]):
         pitch[nonzero_idxs] = np.log(pitch[nonzero_idxs])
 
         for i, phoneme in enumerate(phonemes):
-            pitch[i] = (pitch[i] - float(self.statistic_dict[phoneme]["pitch_mean"])) / float(self.statistic_dict[phoneme]["pitch_std"])
-            energy[i] = (energy[i] - float(self.statistic_dict[phoneme]["pitch_mean"])) / float(self.statistic_dict[phoneme]["pitch_std"])
+            if self.energy_norm:
+                energy[i] = (energy[i] - float(self.statistic_dict[phoneme]["pitch_mean"])) / float(self.statistic_dict[phoneme]["pitch_std"])
+            if self.pitch_norm:
+                pitch[i] = (pitch[i] - float(self.statistic_dict[phoneme]["pitch_mean"])) / float(self.statistic_dict[phoneme]["pitch_std"])
                 
-    
 
         speaker_embs: np.ndarray = np.load(info["speaker_path"])
         speaker_embs_tensor = torch.from_numpy(speaker_embs)

@@ -31,6 +31,8 @@ data:
     - p280
     - p315
     - 0019
+  pitch_norm: true
+  energy_norm: true
 pretrained_hifi: models/en/hifi
 base_model: checkpoints/fastspeech2/fastspeech2/
 

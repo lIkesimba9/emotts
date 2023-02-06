@@ -318,6 +318,8 @@ class Trainer:
             pitch_max=self.pitch_max,
             phoneme_to_ids=self.phonemes_to_id,
             path_to_train_json=self.data_info_dir / TRAIN_FILENAME,
+            pitch_norm=self.config.data.pitch_norm,
+            energy_norm=self.config.data.energy_norm,
         )
         test_dataset = BasicDataset(
             sample_rate=self.config.sample_rate,
@@ -331,6 +333,8 @@ class Trainer:
             pitch_max=self.pitch_max,
             phoneme_to_ids=self.phonemes_to_id,
             path_to_train_json=self.data_info_dir / TEST_FILENAME,
+            pitch_norm=self.config.data.pitch_norm,
+            energy_norm=self.config.data.energy_norm,
         )
 
         collate_fn = BasicCollate()

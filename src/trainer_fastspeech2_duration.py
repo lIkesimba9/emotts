@@ -16,6 +16,10 @@ from src.constants import (
     FASTSPEECH2_MODEL_FILENAME,
     PHONEMES_ENG,
     PHONEMES_CHI,
+    ENERGY_MIN_FILENAME,
+    ENERGY_MAX_FILENAME,
+    PITCH_MIN_FILENAME,
+    PITCH_MAX_FILENAME,
     LOG_DIR,
     MELS_MEAN_FILENAME,
     MELS_STD_FILENAME,
@@ -214,6 +218,11 @@ class Trainer:
             
             self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
             self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
+            self.energy_min = torch.load(mapping_folder / ENERGY_MIN_FILENAME)
+            self.energy_max = torch.load(mapping_folder / ENERGY_MAX_FILENAME)
+            
+            self.pitch_min = torch.load(mapping_folder / PITCH_MIN_FILENAME)
+            self.pitch_max = torch.load(mapping_folder / PITCH_MAX_FILENAME)
             
 
     def upload_checkpoints(self) -> None:
@@ -299,6 +308,8 @@ class Trainer:
             pitch_max=self.pitch_max,
             phoneme_to_ids=self.phonemes_to_id,
             path_to_train_json=self.data_info_dir / TRAIN_FILENAME,
+            pitch_norm=self.config.data.pitch_norm,
+            energy_norm=self.config.data.energy_norm,
         )
         test_dataset = BasicDataset(
             sample_rate=self.config.sample_rate,
@@ -312,6 +323,8 @@ class Trainer:
             pitch_max=self.pitch_max,
             phoneme_to_ids=self.phonemes_to_id,
             path_to_train_json=self.data_info_dir / TEST_FILENAME,
+            pitch_norm=self.config.data.pitch_norm,
+            energy_norm=self.config.data.energy_norm,
         )
 
         collate_fn = BasicCollate()
