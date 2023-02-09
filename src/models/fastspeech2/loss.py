@@ -1,12 +1,15 @@
 import torch
 import torch.nn as nn
 from src.data_process.basic_dataset import BasicBatch
+from .config import LossCoefParams
 
 class FastSpeech2Loss(nn.Module):
     """ FastSpeech2 Loss """
 
-    def __init__(self):
+    def __init__(self, config: LossCoefParams):
         super(FastSpeech2Loss, self).__init__()
+
+        self.config = config
 
         self.mse_loss = nn.MSELoss()
         self.mae_loss = nn.L1Loss()
@@ -52,8 +55,8 @@ class FastSpeech2Loss(nn.Module):
         mel_loss = self.mae_loss(mel_predictions, mel_targets)
         postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
-        pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
-        energy_loss = self.mse_loss(energy_predictions, energy_targets)
+        pitch_loss = self.config.pitch_coef * self.mse_loss(pitch_predictions, pitch_targets)
+        energy_loss = self.config.energy_coef * self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
 
         total_loss = (

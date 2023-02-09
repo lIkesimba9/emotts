@@ -68,10 +68,17 @@ class VarianceEmbeddingParams:
     
 
 @dataclass
+class LossCoefParams:
+    energy_coef: float = field(default=1.0)
+    pitch_coef: float = field(default=1.0)
+
+
+@dataclass
 class VarianceAdaptorParams:
     predictor_params: VariancePredictorParams
     embedding_params: VarianceEmbeddingParams
     attention_config: Optional[GaussianUpsampleParams]
+    loss_params: Optional[LossCoefParams]
 
 
 

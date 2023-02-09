@@ -9,32 +9,32 @@ seed: 42
 batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
-iters_per_checkpoint: 1000
+iters_per_checkpoint: 100000
 total_iterations: 500001
 finetune: false
 test_size: 0.05
 device: cuda:0
 lang: english
-checkpoint_name: fastspeech2
+checkpoint_name: fastspeech2_energy_coef_01_norm
 data:
   dataset_name: neutral_dataset
   context_lenght: 0
-  mels_dir: data/preprocessed/mels
-  wav_dir: data/preprocessed/resampled
-  feature_dir: data/feature_output/fastspeech_base
-  duration_dir: data/preprocessed/duration
-  pitch_dir: data/preprocessed/pitch
-  energy_dir: data/preprocessed/energy
-  text_dir: data/preprocessed/mfa_outputs
-  speaker_emb_dir: data/preprocessed/embeddings
+  mels_dir: /mnt/public32/emotts/data/preprocessed/mels
+  wav_dir: /mnt/public32/emotts/data/preprocessed/resampled_16
+  feature_dir: data/feature_output/fastspeech2_energy_coef_01_norm
+  duration_dir: /mnt/public32/emotts/data/preprocessed/duration
+  pitch_dir: /mnt/public32/emotts/data/preprocessed/pitch
+  energy_dir: /mnt/public32/emotts/data/preprocessed/energy
+  text_dir: /mnt/public32/emotts/data/preprocessed/mfa_outputs
+  speaker_emb_dir: /mnt/public32/emotts/data/preprocessed/embeddings
   ignore_speakers:
     - p280
     - p315
     - 0019
   pitch_norm: true
   energy_norm: true
-pretrained_hifi: models/en/hifi
-base_model: checkpoints/fastspeech2/fastspeech2/
+pretrained_hifi: /mnt/public32/emotts/models/en/hifi
+base_model: checkpoints/fastspeech2_energy_coef_01_norm/fastspeech2/
 
 gst_config:
   ref_enc_filters:
@@ -78,7 +78,10 @@ variance_adapter_params:
   embedding_params:
     n_bins: 256
     pitch_quantization: linear
-    energy_quantization: linear
+    energy_quantization: linear  
+  loss_params:
+    energy_coef: 0.1
+    pitch_coef: 1
 
 train_hifi:
   split_data: true

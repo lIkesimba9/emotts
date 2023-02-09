@@ -155,7 +155,7 @@ class Trainer:
         )
 
 
-        self.criterion = FastSpeech2Loss()
+        self.criterion = FastSpeech2Loss(self.config.variance_adapter_params.loss_params)
 
 
         self.upload_checkpoints()
@@ -172,6 +172,7 @@ class Trainer:
             durations=batch.durations.to(self.device).detach(),
             speaker_embs=batch.speaker_embs.to(self.device).detach(),
         )
+        return batch_on_device
 
     def create_dirs(self) -> None:
         self.checkpoint_path.mkdir(parents=True, exist_ok=True)
@@ -471,7 +472,7 @@ class Trainer:
                             }
                         )                        
 
-                if self.iteration_step % self.config.iters_per_checkpoint == 0:
+                if self.iteration_step % self.config.iters_per_checkpoint == 0 or self.iteration_step == 15000:
                     self.fastspeech2_model.eval()
                     self.validate()
                     self.generate_samples()

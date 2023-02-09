@@ -15,19 +15,26 @@ finetune: false
 test_size: 0.05
 device: cuda:1
 lang: english
-checkpoint_name: fastspeech2_reduced_va
+checkpoint_name: fastspeech2_reduced_va_norm
 data:
-  mels_dir: data/preprocessed/mels
-  wav_dir: data/preprocessed/resampled
-  feature_dir: data/feature_output/fastspeech_reduced_va
-  duration_dir: data/preprocessed/duration
-  pitch_dir: data/preprocessed/pitch
-  energy_dir: data/preprocessed/energy
-  text_dir: data/preprocessed/mfa_outputs
-  speaker_emb_dir: data/preprocessed/embeddings
-  ignore_speakers: []
-pretrained_hifi: models/en/hifi
-base_model: checkpoints/fastspeech2_reduced_va/fastspeech2
+  dataset_name: neutral_dataset
+  context_lenght: 0
+  mels_dir: /mnt/public32/emotts/data/preprocessed/mels
+  wav_dir: /mnt/public32/emotts/data/preprocessed/resampled_16
+  feature_dir: data/feature_output/fastspeech2_reduced_va_norm
+  duration_dir: /mnt/public32/emotts/data/preprocessed/duration
+  pitch_dir: /mnt/public32/emotts/data/preprocessed/pitch
+  energy_dir: /mnt/public32/emotts/data/preprocessed/energy
+  text_dir: /mnt/public32/emotts/data/preprocessed/mfa_outputs
+  speaker_emb_dir: /mnt/public32/emotts/data/preprocessed/embeddings
+  ignore_speakers:
+    - p280
+    - p315
+    - 0019
+  pitch_norm: true
+  energy_norm: true
+pretrained_hifi: /mnt/public32/emotts/models/en/hifi
+base_model: checkpoints/fastspeech2_reduced_va_norm/fastspeech2/
 
 gst_config:
   ref_enc_filters:
@@ -72,6 +79,9 @@ variance_adapter_params:
     n_bins: 256
     pitch_quantization: linear
     energy_quantization: linear
+  loss_params:
+    energy_coef: 1
+    pitch_coef: 1
 
 train_hifi:
   split_data: true
@@ -165,4 +175,3 @@ model:
   mask_padding: true
   phonem_embedding_dim: 512
   speaker_embedding_dim: 256
-
