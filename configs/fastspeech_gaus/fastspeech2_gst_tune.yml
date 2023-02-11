@@ -87,6 +87,9 @@ variance_adapter_params:
     teacher_forcing_ratio: 1.0
     attention_dropout: 0.1
     positional_dropout: 0.0
+  loss_params:
+    energy_coef: 0.1
+    pitch_coef: 1
 
 train_hifi:
   split_data: true

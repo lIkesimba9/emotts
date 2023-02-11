@@ -13,21 +13,22 @@ iters_per_checkpoint: 120000
 total_iterations: 500001
 finetune: false
 test_size: 0.05
-device: cuda:1
+device: cuda:0
 lang: english
 checkpoint_name: fastspeech2_gaus
 data:
-  mels_dir: data/preprocessed/mels
-  wav_dir: data/preprocessed/resampled
+  dataset_name: neutral_dataset
+  mels_dir: data/Jan25_preprocessed/mels
+  wav_dir: data/Jan25_preprocessed/resampled
   feature_dir: data/feature_output/fastspeech_gaus
-  duration_dir: data/preprocessed/duration
-  pitch_dir: data/preprocessed/pitch
-  energy_dir: data/preprocessed/energy
-  text_dir: data/preprocessed/mfa_outputs
-  speaker_emb_dir: data/preprocessed/embeddings
+  duration_dir: data/Jan25_preprocessed/duration
+  pitch_dir: data/Jan25_preprocessed/pitch
+  energy_dir: data/Jan25_preprocessed/energy
+  text_dir: data/Jan25_preprocessed/mfa_outputs
+  speaker_emb_dir: data/Jan25_preprocessed/embeddings
   ignore_speakers: []
 pretrained_hifi: models/en/hifi
-base_model: checkpoints/fastspeech2/fastspeech2/
+base_model: checkpoints/fastspeech2_gaus
 
 gst_config:
   ref_enc_filters:
@@ -86,6 +87,9 @@ variance_adapter_params:
     teacher_forcing_ratio: 1.0
     attention_dropout: 0.1
     positional_dropout: 0.0
+  loss_params:
+    energy_coef: 0.1
+    pitch_coef: 1
 
 train_hifi:
   split_data: true
@@ -157,7 +161,7 @@ model:
       lstm_layers: 2
       lstm_hidden: 256
       dropout: 0.5
-    eps: 1e-6
+    eps: 1e-5
     positional_dim: 32
     teacher_forcing_ratio: 1.0
     attention_dropout: 0.1

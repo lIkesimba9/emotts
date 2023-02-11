@@ -158,7 +158,7 @@ class Trainer:
         )
 
 
-        self.criterion = FastSpeech2Loss()
+        self.criterion = FastSpeech2Loss(self.config.variance_adapter_params.loss_params)
 
 
         self.upload_checkpoints()
