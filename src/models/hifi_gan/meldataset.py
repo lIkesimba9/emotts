@@ -168,7 +168,7 @@ class MelDataset(
         mel_filename = get_mel_file_path(
             filename, 
             self.gold_mels_path, 
-            suffix=self.config.data.mels_ext
+            suffix=self.config.data.data_ext
         )
         mel_loss = torch.tensor(np.load(mel_filename)).unsqueeze(0).cpu()
 
