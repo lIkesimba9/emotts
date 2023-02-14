@@ -172,7 +172,7 @@ class Trainer:
         )
 
 
-        self.criterion = FastSpeech2VoicePrintLoss()
+        self.criterion = FastSpeech2VoicePrintLoss(self.config.loss_coef)
 
 
         self.upload_checkpoints()
@@ -466,7 +466,7 @@ class Trainer:
                             }
                         )                        
 
-                if self.iteration_step % self.config.iters_per_checkpoint == 0:
+                if self.iteration_step % self.config.iters_per_checkpoint == 0 or self.iteration_step == 1:
                     self.fastspeech2_model.eval()
                     self.validate()
                     self.generate_samples()

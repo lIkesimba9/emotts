@@ -15,10 +15,10 @@ finetune: false
 test_size: 0.05
 device: cuda:0
 lang: english
-checkpoint_name: fastspeech2
+checkpoint_name: fastspeech2_Jan24
 data:
   mels_dir: data/preprocessed/mels
-  wav_dir: data/preprocessed/resampled
+  wav_dir: data/preprocessed/resampled_16
   feature_dir: data/feature_output/fastspeech_base
   duration_dir: data/preprocessed/duration
   pitch_dir: data/preprocessed/pitch
@@ -27,7 +27,11 @@ data:
   speaker_emb_dir: data/preprocessed/embeddings
   ignore_speakers: []
 pretrained_hifi: models/en/hifi
-base_model: checkpoints/fastspeech2/fastspeech2/
+base_model: checkpoints/fastspeech2_Jan24/fastspeech2/
+
+loss_coef: 
+  energy_coef: 1
+  pitch_coef: 1
 
 gst_config:
   ref_enc_filters:

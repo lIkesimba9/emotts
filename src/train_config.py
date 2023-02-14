@@ -37,8 +37,15 @@ class LossParams:
 
 
 @dataclass
+class LossCoefParams:
+    energy_coef: float = field(default=1.0)
+    pitch_coef: float = field(default=1.0)
+
+
+@dataclass
 class TrainParams:
     data: DatasetParams
+    loss_coef: LossCoefParams
     test_size: float
     model: ModelParams
     gst_config: GSTParams
