@@ -452,8 +452,7 @@ class FastSpeech2Gaus(FastSpeech2):
         self.gst_emb_dim = gst_config.emb_dim
         self.finetune = finetune
         self.use_gst = config.use_gst
-
-
+ 
         self.encoder = Encoder(config.encoder_params, config.max_seq_len, n_phonems)
 
         self.gst = GST(n_mel_channels=n_mel_channels, config=gst_config)
