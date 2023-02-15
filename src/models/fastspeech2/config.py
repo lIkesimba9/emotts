@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 
 
@@ -37,13 +37,17 @@ class VarianceEmbeddingParams:
     n_bins: int = field(default=256)
     pitch_quantization: Literal['linear', 'log'] = 'linear'
     energy_quantization: Literal['linear', 'log'] = 'linear' # support 'linear' or 'log', 'log' is allowed only if the energy values are not normalized during preprocessing
-    
+
+@dataclass
+class LossCoefParams:
+    energy_coef: float = field(default=1.0)
+    pitch_coef: float = field(default=1.0)
 
 @dataclass
 class VarianceAdaptorParams:
     predictor_params: VariancePredictorParams
     embedding_params: VarianceEmbeddingParams
-
+    loss_params: Optional[LossCoefParams]
 
 
 @dataclass

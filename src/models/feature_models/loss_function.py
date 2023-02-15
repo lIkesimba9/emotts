@@ -52,6 +52,7 @@ class NonAttentiveTacotronVarianceAdaptorLoss(nn.Module):
         self.hop_size = hop_size
         self.mel_weight = config.mels_weight
         self.duration_weight = config.duration_weight
+        self.config = config
 
     def forward(
         self, prenet_mels: torch.Tensor, postnet_mels: torch.Tensor, model_durations: torch.Tensor,
@@ -72,7 +73,7 @@ class NonAttentiveTacotronVarianceAdaptorLoss(nn.Module):
         loss_postnet = self.mel_weight * (postnet_l1 + postnet_l2)
         model_durations = model_durations * self.hop_size / self.sample_rate
         target_durations = target_durations * self.hop_size / self.sample_rate
-        loss_pitch = F.mse_loss(model_pitches, target_pitches)
-        loss_energy = F.mse_loss(model_enegries, target_energies)
+        loss_pitch = self.config.pitch_coef * F.mse_loss(model_pitches, target_pitches)
+        loss_energy = self.config.energy_coef * F.mse_loss(model_enegries, target_energies)
         loss_durations = self.duration_weight * F.mse_loss(model_durations, target_durations)
         return loss_prenet, loss_postnet, loss_durations, loss_pitch, loss_energy

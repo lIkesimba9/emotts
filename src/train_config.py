@@ -34,6 +34,8 @@ class LossParams:
     mels_weight: float = field(default=1.0)
     duration_weight: float = field(default=2.0)
     adversarial_weight: float = field(default=5e-3)
+    energy_coef: float = field(default=1.0)
+    pitch_coef: float = field(default=1.0)
 
 
 @dataclass
