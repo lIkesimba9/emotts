@@ -167,6 +167,7 @@ class Attention(nn.Module):
     def __init__(self, embedding_dim: int, config: GaussianUpsampleParams):
         super().__init__()
         self.teacher_forcing_ratio = config.teacher_forcing_ratio
+        self.golden_duration_forcing = config.golden_duration_forcing
         self.eps = torch.Tensor([config.eps])
         self.dropout = config.attention_dropout
         self.duration_predictor = DurationPredictor(
@@ -203,7 +204,10 @@ class Attention(nn.Module):
         input_lengths = input_lengths.cpu().numpy()
 
         durations = self.duration_predictor(embeddings, input_lengths)
-        ranges = self.range_predictor(embeddings, durations, input_lengths)
+        if self.golden_duration_forcing:
+            ranges = self.range_predictor(embeddings, y_durations.unsqueeze(2), input_lengths)
+        else:
+            ranges = self.range_predictor(embeddings, durations, input_lengths)
 
         if random.uniform(0, 1) > self.teacher_forcing_ratio:  # type: ignore
             scores = self.calc_scores(durations, ranges)
