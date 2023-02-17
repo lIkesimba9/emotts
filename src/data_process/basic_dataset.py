@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union
 from torch.utils.data import Dataset
 
+from src.data_process.audio_utils import seconds_to_frame
 
 import numpy as np
 import torch
@@ -46,6 +47,8 @@ class BasicDataset(Dataset[BasicSample]):
         self,
         sample_rate: int,
         hop_size: int,
+        frames_per_step: int,
+        duration_type: str,
         mels_mean: torch.Tensor,
         mels_std: torch.Tensor,
         statistic_dict: Dict,
@@ -63,6 +66,10 @@ class BasicDataset(Dataset[BasicSample]):
         self._dataset.sort(key=lambda x: x["phonemes_length"])
         self.sample_rate = sample_rate
         self.hop_size = hop_size
+        self.frames_per_step = frames_per_step
+        if (self.frames_per_step is None):
+            self.frames_per_step = 1
+        self.duration_type = duration_type
         self.mels_mean = mels_mean
         self.mels_std = mels_std
         self.statistic_dict = statistic_dict
@@ -88,8 +95,34 @@ class BasicDataset(Dataset[BasicSample]):
         ]
         phonemes = [x.text for x in phones_tier.get_copy_with_gaps_filled()]
 
+        ## loading number of frames
+        ## TODO: Best to change to number of seconds and float32 in later versions
+        if (self.duration_type == "int"):
+            durations_in_frames = np.array(
+                        [
+                                int(np.round(seconds_to_frame(x.end_time,
+                                    self.sample_rate, self.hop_size))) - int(np.round(seconds_to_frame(x.start_time,
+self.sample_rate, self.hop_size)))
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+        elif (self.duration_type == "float"):
+            durations_in_frames = np.array(
+                        [
+                                seconds_to_frame(x.end_time,
+                                    self.sample_rate, self.hop_size) - seconds_to_frame(x.start_time, self.sample_rat
+e, self.hop_size)
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+        elif (self.duration_type == "from_disk"):
+            durations_in_frames: np.array = np.load(info["duration_path"])    
+        else:
+            raise ValueError("Unknown value for duration_type: " + self.duration_type)
 
-        durations: np.array = np.load(info["duration_path"])
+        durations = durations_in_frames
 
         mels: torch.Tensor = torch.Tensor(np.load(info["mel_path"]))
         mels = (mels - self.mels_mean) / self.mels_std
