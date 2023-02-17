@@ -2,96 +2,57 @@
 
 ## Basic Architecture
 - feature extractor:
-    - Attention-based Tacotron 2;
-    - Non-Attentive Tacotron (multi-speaker);
+    - Non-Attentive Tacotron; implementation based on [NAT repo](https://github.com/Garvit-32/Non-Attentive-Tacotron/);
+    - FastSpeech2; implementation based on [FastSpeech2 repo](https://github.com/ming024/FastSpeech2);
+    ```
+    Input features: phoneme embedding, style embedding, speaker embedding.
+    ```
+
 - vocoder:
-    - pretrained HiFi-GAN (better performance, but needs fine-tuning; 
-    
+    - pretrained HiFi-GAN (better performance, but needs fine-tuning); [HiFiGAN repo](https://github.com/jik876/hifi-gan);
+
       NOTE: pretrained models work with 22.05 kHz (sample rate) audio only);
-     
-    [HiFiGAN repo](https://github.com/jik876/hifi-gan)
-    
-      Input features: 80-dim mel spectral features.
-    
-    - pretrained LPCNet (worse sound quality, but may be easier to train; 
-    
-      NOTE: sample rate = 16 kHz (hard coded in the mozilla repo)).
-      
-    [LPCNet repo by Mozilla](https://github.com/mozilla/LPCNet)
-    
-      Input features: 20-dim BFC features (18 bark cepstrum coefficients + 2 pitch features (pitch coef and pitch correlation)).
-      
-NOTE: Downsampling a raw audio is ok (sound quality is slightly lower, but still very decent). Upsampling... might lead to synthesis quality degradation, need to check...
-    
-Attention-based Tacotron: teacher forcing (during training; feed golden previous mel).
+    ```
+    Input features: 80-dim mel spectral features.
+    ```
 
-## 1. Neutral Synthesis (baseline)
 
-Introduce a metric for emotion synthesis evaluation.
+## Data Preprocessing
+1. Pausation cutting with VAD ([Silero VAD](https://github.com/snakers4/silero-vad));
+2. Resampling audio and converting stereo to mono;
+3. Normalization:
+    - converting to lowercase;
+    - expanding numbers and abbreviations:
+        - 123 -> hundred and twenty-three, 10/10/2021 -> tenth October two thousand twenty one;
+    - collapsing whitespace;
+4. MFA Alignment (external forced aligner):
+    - output in TextGrid format (convert to durations: `npy`-array of durations in seconds / in frames);
 
-### Datasets
-- Single-speaker:
-    - **LJSpeech (1st priority, easier to download)**;
-    - Nancy (needs an academic request, but corpus quality is better than LJSpeech);
-- Multi-speaker:
-    - **VCTK (1st priority, but has issues with pauses (see below))**;
-    - libritts (more problematic without additional filtration / preprocessing).
+5. Feature extraction: pitch, energy, duration, mel-spectrogram(80-dim) with Z-normalization and speaker embeddings;
 
-### Data Proprocessing
-- basic preprocessing: pausation cutting (threshold-based method on spectrogram / VAD (pyvad));
-- feature extraction: mel-spectrum (80-dim);
-- normalization (channel-wise): standard deviation = 1.0, mean = 0.0;
-- text normalization and phonemization: espeak-ng phonemizer (choose American / English accent);
-
-NOTE: The phonetisation actually needs to correspond to the phonetisation used by the aligner. Since you will most likely be using a pretrained aligner (although you may retrain MFA, for example, on your own data), one needs to take the phonemizer that was used for training that model. MFA has some built-in G2P models (G2P: grapheme to phoneme conversion = phonemization). So espeak may not be the optimal choise here, because you will have to retrain MFA / Gentle. Better look into what MFA / Gentle has to offer in terms of phonemizers. NOTE: at training stage MFA does not need a phonemizer, only a lexicon is needed. At inference you will need a standalone phonemizer. 
-
-Normalization: 123 -> hundred and twenty-three, 10/10/2021 -> tenth October two thousand twenty one
-
-Phonemization (like in the dictionary): thought -> θɔːt
-
-- metafile for Tacotron training: audio-id|text-transcript|preprocessed-text-transcript.
-
-Non-Attentive Tacotron specific data preprocessing:
-- external phone-level aligner (forced aligner):
-    - MFA: output in TextGrid format (convert to durations: `npy`-array of durations in seconds / in frames);
-    - Gentle (claimes to be able to align non-verbal emotion expression) (NOTE: for English only).
-
-Aligner (at inference stage for training set preprocessing): takes as input (text graphemic, audio) + lexicon.
-
-Lexicon:
-  word \t phonemization_1
-  word \t phonemization_2
-  
-Output from aligner: alignment + phonetization 
-    --> extract phonetic transcripts from right side of alignments;
-    --> alignments --> durations --> duration loss;
-    
---- Tacotron inference ---
-  * no durations, no alignemnts, MFA cannot work here;
-  * durations are predicted by Tacotron duration predictor;
-  * phonetisations need to preducted by another model (phonemizer);
-
-## 2. Basic Emotional Synthesis
-
-### Datasets
-- Emo-V-DB (problems with non-speech segments);
-- [MSP-Podcast](https://ecs.utdallas.edu/research/researchlabs/msp-lab/MSP-Podcast.html) / [MSP-Improv](https://ecs.utdallas.edu/research/researchlabs/msp-lab/MSP-Improv.html): waiting for reply;
-- [MSP-Face](https://ecs.utdallas.edu/research/researchlabs/msp-lab/MSP-Face.html) : available for download without any special request (quality to be verified);
-- Internal Huawei Russian dataset (cons: 1 speaker, access to only 1 of the 4 team members);
-- others (look for data with sample rate of 22 kHz or more).
-
-### Realisation:
-- lookup embedding.
-
-## 3. Advanced Emotional Synthesis
+## Style Encoding
 - GST-based (global style tokens): prosody transfer model;
-- modifications on top of GST.
+
+## Speaker Encoding
+- lookup embedding;
+- embedding from pretrained VoicePrint encoder; [source code](https://github.com/CorentinJ/Real-Time-Voice-Cloning/wiki/Pretrained-models);
 
 ## Useful Links
 
 ### Repositories
 - [Tacotron 2](https://github.com/NVIDIA/tacotron2)
 - [Non-Annentive Tacotron](https://github.com/Garvit-32/Non-Attentive-Tacotron/)
+- [FastSpeech2](https://github.com/ming024/FastSpeech2)
+- [HiFiGAN](https://github.com/jik876/hifi-gan)
+- [VoicePrint encoder](https://github.com/CorentinJ/Real-Time-Voice-Cloning/wiki/Pretrained-models)
+- [Silero VAD](https://github.com/snakers4/silero-vad)
+- [MFA](https://github.com/MontrealCorpusTools/Montreal-Forced-Aligner)
+
+
+### Datasets
+- [VCTK](https://datashare.ed.ac.uk/handle/10283/3443)
+- [FreeST](https://openslr.elda.org/resources/38/ST-CMDS-20170001_1-OS.tar.gz)
+- [ESD](https://github.com/HLTSingapore/Emotional-Speech-Data)
 
 ### Articles
 - [28 Nov 2017] [Emotional End-to-End Neural Speech synthesizer](https://arxiv.org/pdf/1711.05447.pdf)
@@ -99,3 +60,56 @@ Output from aligner: alignment + phonetization
 - [06 Aug 2019] [Robust Sequence-to-Sequence Acoustic Modeling with Stepwise Monotonic Attention for Neural TTS](https://arxiv.org/pdf/1906.00672)
 - [23 Oct 2020] [HiFi-GAN: Generative Adversarial Networks for Efficient and High Fidelity Speech Synthesis](https://arxiv.org/pdf/2010.05646)
 - [11 May 2021] [Non-Attentive Tacotron: Robust and Controllable Neural TTS Synthesis Including Unsupervised Duration Modeling](https://arxiv.org/pdf/2010.04301)
+
+## Experiments
+
+### Preprocessing
+
+#### Preprocessing VCTK
+- Move ```vctk.zip``` file to ```vctk_preprocessing/data/zip/vctk.zip``` and run
+```
+bash vctk_preprocessing/vctk_preprocessing.sh
+```
+
+#### Preprocessing ESD
+- Move ```Emotional Speech Dataset (ESD).zip``` file to ```esd_preprocessing/data/zip/Emotional Speech Dataset (ESD).zip``` and run
+```
+bash esd_preprocessing/esd_preprocessing.sh
+```
+
+#### Merge VCTK and ESD
+- You need to merge ```data/processed/vctk``` and ```data/processed/esd``` in ```data/preprocessed/``` with such subdirectories
+    - ```data/preprocessed/mels```
+    - ```data/preprocessed/resampled```
+    - ```data/preprocessed/duration ```
+    - ```data/preprocessed/pitch ```
+    - ```data/preprocessed/energy```
+    - ```data/preprocessed/phones ```
+    - ```data/preprocessed/embeddings```
+- Open config file from config/ and set path to data.
+- Also download hifi and set up ```pretrained_hifi: /path/to/models/hifi```
+
+### Training Base Tacotron
+#### Training
+```
+conda env create -f environment.yml
+conda activate emmots
+python train_non_attentive_voiceprint.py --config configs/nat_inflated/nat_inflated.yml
+```
+
+#### Change last checkpoint for tuning
+Rename ```checkpoints/nat_inflated/feature/500000_feature_model.pth``` into
+```checkpoints/nat_inflated/feature/feature_model.pth```
+#### Tuning
+- Check ```data``` and ```pretrained_hifi``` in ```nat_inflated_tune.yml``` (same as in the ```nat_inflated.yml```)
+```
+python train_non_attentive_voiceprint.py --config configs/nat_inflated/nat_inflated_tune.yml
+```
+
+### Tensorboard
+```
+tensorboard --logdir logs/
+```
+
+## NOTE:
+- Gentle (claimes to be able to align non-verbal emotion expression) (NOTE: for English only);
