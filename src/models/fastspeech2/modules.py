@@ -420,7 +420,7 @@ class VarianceAdaptorGaus(nn.Module):
         )
 
         
-        log_duration_prediction = torch.log(durations + 1)
+        log_duration_prediction = durations
         return (
             attented_embeddings,
             pitch_prediction,
