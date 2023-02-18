@@ -20,8 +20,8 @@ class DatasetParams:
     speaker_emb_dir: Optional[str] = field(default=None)
     pitch_dir: Optional[str] = field(default=None)
     energy_dir: Optional[str] = field(default=None)
-    pitch_norm: bool = field(default=True)
-    energy_norm: bool = field(default=True)
+    pitch_norm: bool = field(default=False)
+    energy_norm: bool = field(default=False)
     
     finetune_speakers: List[str] = field(
         default_factory=lambda: [f"00{i}" for i in range(11, 21)]
