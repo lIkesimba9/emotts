@@ -28,7 +28,7 @@ class GaussianUpsampleParams:
     teacher_forcing_ratio: float = field(default=1.0)
     attention_dropout: float = field(default=0.1)
     positional_dropout: float = field(default=0.0)
-
+    golden_duration_forcing: bool = field(default=False)
 
 
 @dataclass
