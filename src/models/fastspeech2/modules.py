@@ -78,6 +78,8 @@ class VarianceAdaptor(nn.Module):
         self.length_regulator = LengthRegulator()
         self.pitch_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
         self.energy_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
+        self.energy_norm = config.energy_norm
+        self.pitch_norm = config.pitch_norm
         self.phonemes_statistic_dict = phonemes_statistic_dict
 
 
@@ -144,11 +146,15 @@ class VarianceAdaptor(nn.Module):
     def get_pitch_embedding(self, x, target, mask, phonemes, control):
         prediction = self.pitch_predictor(x, mask)
         if target is not None:
-            denorm_target = self.denormalize_pitch(target, phonemes)    
+            denorm_target = target
+            if self.pitch_norm:
+                denorm_target = self.denormalize_pitch(target, phonemes)    
             embedding = self.pitch_embedding(torch.bucketize(denorm_target, self.pitch_bins))
         else:
             prediction = prediction * control
-            denorm_prediction = self.denormalize_pitch(prediction, phonemes)    
+            denorm_prediction = prediction
+            if self.pitch_norm:
+                denorm_prediction = self.denormalize_pitch(prediction, phonemes)    
             embedding = self.pitch_embedding(
                 torch.bucketize(denorm_prediction, self.pitch_bins)
             )
@@ -157,11 +163,15 @@ class VarianceAdaptor(nn.Module):
     def get_energy_embedding(self, x, target, mask, phonemes, control):
         prediction = self.energy_predictor(x, mask)
         if target is not None:
-            denorm_target = self.denormalize_energy(target, phonemes)  
+            denorm_target = target
+            if self.energy_norm:
+                denorm_target = self.denormalize_energy(target, phonemes)  
             embedding = self.energy_embedding(torch.bucketize(denorm_target, self.energy_bins))
         else:
             prediction = prediction * control
-            denorm_prediction = self.denormalize_energy(prediction, phonemes)  
+            denorm_prediction = prediction
+            if elf.energy_norm:
+                denorm_prediction = self.denormalize_energy(prediction, phonemes)  
             embedding = self.energy_embedding(
                 torch.bucketize(denorm_prediction, self.energy_bins)
             )
