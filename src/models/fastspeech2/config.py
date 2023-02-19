@@ -79,7 +79,8 @@ class VarianceAdaptorParams:
     embedding_params: VarianceEmbeddingParams
     attention_config: Optional[GaussianUpsampleParams]
     loss_params: Optional[LossCoefParams]
-
+    energy_norm: bool = field(default=False)
+    pitch_norm: bool = field(default=False)
 
 
 @dataclass

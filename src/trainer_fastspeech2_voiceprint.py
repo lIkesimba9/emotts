@@ -37,7 +37,7 @@ from src.models.fastspeech2.fastspeech2 import FastSpeech2VoicePrint
 from src.models.fastspeech2.loss import FastSpeech2Loss
 from src.models.hifi_gan.models import Generator, load_model as load_hifi
 from src.train_config import TrainParams
-
+from src.data_process.utils import PAD_TOKEN
 
 
 class Trainer:
@@ -98,6 +98,7 @@ class Trainer:
             gst_config=self.config.gst_config,
             finetune=self.config.finetune,
             variance_adaptor=self.config.variance_adapter_params,
+            phonemes_statistic_dict=self.phonemes_statistic_dict,
         ).to(self.device)
 
         if self.config.finetune:
@@ -221,7 +222,16 @@ class Trainer:
 
             with open(mapping_folder / STATISTIC_FILENAME) as f:
                 self.statistic_dict = json.load(f)
-            
+
+            self.phonemes_statistic_dict = {
+             id_phoneme: {
+                "pitch_mean": float(self.statistic_dict[phoneme]["pitch_mean"]),
+                "pitch_std": float(self.statistic_dict[phoneme]["pitch_std"]),
+                "energy_mean": float(self.statistic_dict[phoneme]["energy_mean"]),
+                "energy_std": float(self.statistic_dict[phoneme]["energy_std"])
+             }   for phoneme, id_phoneme in self.phonemes_to_id.items() if phoneme != PAD_TOKEN
+            }
+     
             self.mels_mean = torch.load(mapping_folder / MELS_MEAN_FILENAME)
             self.mels_std = torch.load(mapping_folder / MELS_STD_FILENAME)
             

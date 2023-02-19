@@ -9,7 +9,7 @@ from src.models.fastspeech2.transformer.Models import Encoder, Decoder
 from src.models.fastspeech2.transformer.Layers import PostNet
 from .modules import VarianceAdaptor, LengthRegulator, VariancePredictor, VarianceAdaptorGaus
 from .utils import get_mask_from_lengths
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from src.data_process.basic_dataset import BasicBatch
 from src.models.feature_models.gst import GST
@@ -23,7 +23,8 @@ class FastSpeech2(nn.Module):
 
     def __init__(self, config: FastSpeech2Params, n_mel_channels: int,
             n_phonems: int, n_speakers: int, pitch_min: float, pitch_max: float, 
-            energy_min: float, energy_max: float, gst_config: GSTParams, finetune: bool, variance_adaptor: VarianceAdaptorParams):
+            energy_min: float, energy_max: float, gst_config: GSTParams, finetune: bool, 
+            variance_adaptor: VarianceAdaptorParams, phonemes_statistic_dict: Dict):
         super(FastSpeech2, self).__init__()
         self.model_config = config
         self.gst_emb_dim = gst_config.emb_dim
@@ -36,7 +37,7 @@ class FastSpeech2(nn.Module):
         self.gst = GST(n_mel_channels=n_mel_channels, config=gst_config)
         
         self.variance_adaptor = VarianceAdaptor(variance_adaptor, pitch_min, pitch_max, 
-        energy_min, energy_max, config.encoder_params.encoder_hidden)
+        energy_min, energy_max, config.encoder_params.encoder_hidden, phonemes_statistic_dict)
         
         self.decoder = Decoder(config.decoder_params, config.max_seq_len)
         
@@ -93,6 +94,7 @@ class FastSpeech2(nn.Module):
             batch.pitches,
             batch.energies,
             batch.durations,
+            batch.phonemes,
             p_control,
             e_control,
             d_control,
@@ -144,7 +146,7 @@ class FastSpeech2(nn.Module):
         
         output = output + speaker_emb
 
-        (output, mel_lens, mel_masks) = self.variance_adaptor.inference(output, src_masks, p_control, e_control, d_control)
+        (output, mel_lens, mel_masks) = self.variance_adaptor.inference(output, src_masks, phonemes, p_control, e_control, d_control)
 
         output, mel_masks = self.decoder(output, mel_masks)
         output = self.mel_linear(output)
@@ -167,7 +169,8 @@ class FastSpeech2VoicePrint(FastSpeech2):
 
     def __init__(self, config: FastSpeech2Params, n_mel_channels: int,
             n_phonems: int, n_speakers: int, pitch_min: float, pitch_max: float, 
-            energy_min: float, energy_max: float, gst_config: GSTParams, finetune: bool, variance_adaptor: VarianceAdaptorParams):
+            energy_min: float, energy_max: float, gst_config: GSTParams, finetune: bool, 
+            variance_adaptor: VarianceAdaptorParams, phonemes_statistic_dict: Dict):
         super(FastSpeech2, self).__init__()
         self.model_config = config
         self.gst_emb_dim = gst_config.emb_dim
@@ -180,7 +183,7 @@ class FastSpeech2VoicePrint(FastSpeech2):
         self.gst = GST(n_mel_channels=n_mel_channels, config=gst_config)
         
         self.variance_adaptor = VarianceAdaptor(variance_adaptor, pitch_min, pitch_max, 
-        energy_min, energy_max, config.encoder_params.encoder_hidden)
+        energy_min, energy_max, config.encoder_params.encoder_hidden, phonemes_statistic_dict)
         
         self.decoder = Decoder(config.decoder_params, config.max_seq_len)
         
@@ -240,6 +243,7 @@ class FastSpeech2VoicePrint(FastSpeech2):
             batch.pitches,
             batch.energies,
             batch.durations,
+            batch.phonemes,
             p_control,
             e_control,
             d_control,
@@ -291,7 +295,7 @@ class FastSpeech2VoicePrint(FastSpeech2):
             -1, max_phonemes_len, -1
         )
 
-        (output, mel_lens, mel_masks) = self.variance_adaptor.inference(output, src_masks, p_control, e_control, d_control)
+        (output, mel_lens, mel_masks) = self.variance_adaptor.inference(output, src_masks, phonemes, p_control, e_control, d_control)
 
         output, mel_masks = self.decoder(output, mel_masks)
         output = self.mel_linear(output)
@@ -446,7 +450,8 @@ class FastSpeech2Gaus(FastSpeech2):
 
     def __init__(self, config: FastSpeech2Params, n_mel_channels: int,
             n_phonems: int, n_speakers: int, pitch_min: float, pitch_max: float, 
-            energy_min: float, energy_max: float, gst_config: GSTParams, finetune: bool, variance_adaptor: VarianceAdaptorParams):
+            energy_min: float, energy_max: float, gst_config: GSTParams, finetune: bool, 
+            variance_adaptor: VarianceAdaptorParams, phonemes_statistic_dict: Dict):
         super(FastSpeech2, self).__init__()
         self.model_config = config
         self.gst_emb_dim = gst_config.emb_dim
@@ -458,7 +463,7 @@ class FastSpeech2Gaus(FastSpeech2):
         self.gst = GST(n_mel_channels=n_mel_channels, config=gst_config)
         
         self.variance_adaptor = VarianceAdaptorGaus(variance_adaptor, pitch_min, pitch_max, 
-        energy_min, energy_max, config.encoder_params.encoder_hidden)
+        energy_min, energy_max, config.encoder_params.encoder_hidden, phonemes_statistic_dict)
         
         self.decoder = Decoder(config.decoder_params, config.max_seq_len)
         
@@ -519,6 +524,7 @@ class FastSpeech2Gaus(FastSpeech2):
             batch.energies,
             batch.durations,
             batch.num_phonemes,
+            batch.phonemes,
             p_control,
             e_control,
         )
@@ -569,7 +575,7 @@ class FastSpeech2Gaus(FastSpeech2):
             -1, max_phonemes_len, -1
         )
 
-        (output, mel_lens, mel_masks) = self.variance_adaptor.inference(output, src_masks, num_phonemes, p_control, e_control, d_control)
+        (output, mel_lens, mel_masks) = self.variance_adaptor.inference(output, src_masks, num_phonemes, phonemes, p_control, e_control, d_control)
 
         output, mel_masks = self.decoder(output, mel_masks)
         output = self.mel_linear(output)

@@ -13,6 +13,8 @@ from torch.distributions import Normal
 from typing import List, Tuple
 from torch.nn import functional as f
 
+from typing import List, Tuple, Dict
+
 from .utils import get_mask_from_lengths, pad
 
 from src.models.fastspeech2.config import VariancePredictorParams, VarianceAdaptorParams, DurationParams, GaussianUpsampleParams, RangeParams
@@ -70,12 +72,15 @@ class VarianceAdaptor(nn.Module):
     """Variance Adaptor"""
 
     def __init__(self, config: VarianceAdaptorParams, pitch_min: float, pitch_max: float, 
-            energy_min: float, energy_max: float, encoder_hidden: int):
+            energy_min: float, energy_max: float, encoder_hidden: int, phonemes_statistic_dict: Dict):
         super(VarianceAdaptor, self).__init__()
         self.duration_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
         self.length_regulator = LengthRegulator()
         self.pitch_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
         self.energy_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
+        self.energy_norm = config.energy_norm
+        self.pitch_norm = config.pitch_norm
+        self.phonemes_statistic_dict = phonemes_statistic_dict
 
 
         pitch_quantization = config.embedding_params.pitch_quantization
@@ -117,29 +122,63 @@ class VarianceAdaptor(nn.Module):
             n_bins, encoder_hidden
         )
 
-    def get_pitch_embedding(self, x, target, mask, control):
+    def denormalize(self, values, phonemes, key_mean, key_std):
+        batch_size = values.shape[0]
+        phonemes_count = values.shape[1]
+        denorm_values = torch.zeros((batch_size, phonemes_count)).to(values.device)
+        for i in range(batch_size):
+            for j in range(phonemes_count):
+                if phonemes[i, j] in self.phonemes_statistic_dict:
+                    denorm_values[i, j] = (values[i, j] + self.phonemes_statistic_dict[phonemes[i, j]][key_mean]) * self.phonemes_statistic_dict[phonemes[i, j]][key_std]
+                else:
+                    denorm_values[i, j] = values[i, j]
+        return denorm_values
+
+
+
+    def denormalize_pitch(self, values, phonemes):
+        return self.denormalize(values=values, phonemes=phonemes, key_mean="pitch_mean", key_std="pitch_std")
+    
+
+    def denormalize_energy(self, values, phonemes):
+        return self.denormalize(values=values, phonemes=phonemes, key_mean="energy_mean", key_std="energy_std")
+    
+    def get_pitch_embedding(self, x, target, mask, phonemes, control):
         prediction = self.pitch_predictor(x, mask)
         if target is not None:
-            embedding = self.pitch_embedding(torch.bucketize(target, self.pitch_bins))
+            denorm_target = target
+            if self.pitch_norm:
+                denorm_target = self.denormalize_pitch(target, phonemes)    
+            embedding = self.pitch_embedding(torch.bucketize(denorm_target, self.pitch_bins))
         else:
             prediction = prediction * control
+            denorm_prediction = prediction
+            if self.pitch_norm:
+                denorm_prediction = self.denormalize_pitch(prediction, phonemes)    
             embedding = self.pitch_embedding(
-                torch.bucketize(prediction, self.pitch_bins)
+                torch.bucketize(denorm_prediction, self.pitch_bins)
             )
         return prediction, embedding
 
-    def get_energy_embedding(self, x, target, mask, control):
+    def get_energy_embedding(self, x, target, mask, phonemes, control):
         prediction = self.energy_predictor(x, mask)
         if target is not None:
-            embedding = self.energy_embedding(torch.bucketize(target, self.energy_bins))
+            denorm_target = target
+            if self.energy_norm:
+                denorm_target = self.denormalize_energy(target, phonemes)  
+            embedding = self.energy_embedding(torch.bucketize(denorm_target, self.energy_bins))
         else:
             prediction = prediction * control
+            denorm_prediction = prediction
+            if elf.energy_norm:
+                denorm_prediction = self.denormalize_energy(prediction, phonemes)  
             embedding = self.energy_embedding(
-                torch.bucketize(prediction, self.energy_bins)
+                torch.bucketize(denorm_prediction, self.energy_bins)
             )
         return prediction, embedding
 
     def forward(self, x, src_mask, mel_mask, max_len, pitch_target, energy_target, duration_target,
+        phonemes, 
         p_control=1.0,
         e_control=1.0,
         d_control=1.0,
@@ -148,12 +187,12 @@ class VarianceAdaptor(nn.Module):
         log_duration_prediction = self.duration_predictor(x, src_mask)
 
         pitch_prediction, pitch_embedding = self.get_pitch_embedding(
-            x, pitch_target, src_mask, p_control
+            x, pitch_target, src_mask,  phonemes, p_control
         )
         x = x + pitch_embedding
 
         energy_prediction, energy_embedding = self.get_energy_embedding(
-            x, energy_target, src_mask, e_control
+            x, energy_target, src_mask,  phonemes, e_control
         )
         x = x + energy_embedding
 
@@ -167,16 +206,16 @@ class VarianceAdaptor(nn.Module):
             mel_mask,
         )
     
-    def inference(self, x, src_mask, p_control=1.0, e_control=1.0, d_control=1.0):
+    def inference(self, x, src_mask, phonemes, p_control=1.0, e_control=1.0, d_control=1.0):
         log_duration_prediction = self.duration_predictor(x, src_mask)
 
         _, pitch_embedding = self.get_pitch_embedding(
-            x, None, src_mask, p_control
+            x, None, src_mask, phonemes, p_control
         )
         x = x + pitch_embedding
 
         _, energy_embedding = self.get_energy_embedding(
-            x, None, src_mask, e_control
+            x, None, src_mask, phonemes, e_control
         )
         x = x + energy_embedding
 
@@ -329,13 +368,14 @@ class VarianceAdaptorGaus(nn.Module):
     """Variance Adaptor"""
 
     def __init__(self, config: VarianceAdaptorParams, pitch_min: float, pitch_max: float, 
-            energy_min: float, energy_max: float, encoder_hidden: int):
+            energy_min: float, energy_max: float, encoder_hidden: int, phonemes_statistic_dict: Dict):
         super(VarianceAdaptorGaus, self).__init__()
         #self.duration_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
         #self.length_regulator = LengthRegulator()
         self.attention = Attention(encoder_hidden, config.attention_config)
         self.pitch_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
         self.energy_predictor = VariancePredictor(config.predictor_params, encoder_hidden)
+        self.phonemes_statistic_dict = phonemes_statistic_dict
 
 
         pitch_quantization = config.embedding_params.pitch_quantization
@@ -377,40 +417,66 @@ class VarianceAdaptorGaus(nn.Module):
             n_bins, encoder_hidden
         )
 
-    def get_pitch_embedding(self, x, target, mask, control):
+    def denormalize(self, values, phonemes, key_mean, key_std):
+        batch_size = values.shape[0]
+        phonemes_count = values.shape[1]
+        denorm_values = torch.zeros((batch_size, phonemes_count)).to(values.device)
+        for i in range(batch_size):
+            for j in range(phonemes_count):
+                if phonemes[i, j] in self.phonemes_statistic_dict:
+                    denorm_values[i, j] = (values[i, j] + self.phonemes_statistic_dict[phonemes[i, j]][key_mean]) * self.phonemes_statistic_dict[phonemes[i, j]][key_std]
+                else:
+                    denorm_values[i, j] = values[i, j]
+        return denorm_values
+
+
+
+    def denormalize_pitch(self, values, phonemes):
+        return self.denormalize(values=values, phonemes=phonemes, key_mean="pitch_mean", key_std="pitch_std")
+    
+
+    def denormalize_energy(self, values, phonemes):
+        return self.denormalize(values=values, phonemes=phonemes, key_mean="energy_mean", key_std="energy_std")
+    
+    def get_pitch_embedding(self, x, target, mask, phonemes, control):
         prediction = self.pitch_predictor(x, mask)
         if target is not None:
-            embedding = self.pitch_embedding(torch.bucketize(target, self.pitch_bins))
+            denorm_target = self.denormalize_pitch(target, phonemes)    
+            embedding = self.pitch_embedding(torch.bucketize(denorm_target, self.pitch_bins))
         else:
             prediction = prediction * control
+            denorm_prediction = self.denormalize_pitch(prediction, phonemes)    
             embedding = self.pitch_embedding(
-                torch.bucketize(prediction, self.pitch_bins)
+                torch.bucketize(denorm_prediction, self.pitch_bins)
             )
         return prediction, embedding
 
-    def get_energy_embedding(self, x, target, mask, control):
+    def get_energy_embedding(self, x, target, mask, phonemes, control):
         prediction = self.energy_predictor(x, mask)
         if target is not None:
-            embedding = self.energy_embedding(torch.bucketize(target, self.energy_bins))
+            denorm_target = self.denormalize_energy(target, phonemes)  
+            embedding = self.energy_embedding(torch.bucketize(denorm_target, self.energy_bins))
         else:
             prediction = prediction * control
+            denorm_prediction = self.denormalize_energy(prediction, phonemes)  
             embedding = self.energy_embedding(
-                torch.bucketize(prediction, self.energy_bins)
+                torch.bucketize(denorm_prediction, self.energy_bins)
             )
         return prediction, embedding
 
     def forward(self, x, src_mask, mel_mask, max_len, pitch_target, energy_target, duration_target, num_phonemes,
+        phonemes,
         p_control=1.0,
         e_control=1.0,  
     ):
 
       
         pitch_prediction, pitch_embedding = self.get_pitch_embedding(
-            x, pitch_target, src_mask, p_control
+            x, pitch_target, src_mask, phonemes, p_control
         )
 
         energy_prediction, energy_embedding = self.get_energy_embedding(
-            x, energy_target, src_mask, e_control
+            x, energy_target, src_mask, phonemes, e_control
         )
         
         x = x + pitch_embedding
@@ -429,16 +495,16 @@ class VarianceAdaptorGaus(nn.Module):
             mel_mask,
         )
     
-    def inference(self, x, src_mask, num_phonemes, p_control=1.0, e_control=1.0, d_control=1.0):
+    def inference(self, x, src_mask, num_phonemes, phonemes, p_control=1.0, e_control=1.0, d_control=1.0):
         #log_duration_prediction = self.duration_predictor(x, src_mask)
 
         _, pitch_embedding = self.get_pitch_embedding(
-            x, None, src_mask, p_control
+            x, None, src_mask, phonemes, p_control
         )
 
 
         _, energy_embedding = self.get_energy_embedding(
-            x, None, src_mask, e_control
+            x, None, src_mask, phonemes, e_control
         )
         x = x + pitch_embedding
         x = x + energy_embedding

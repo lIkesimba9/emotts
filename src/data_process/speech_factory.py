@@ -374,10 +374,6 @@ class SpeechFactory:
                 nonzero_idxs = np.where(pitch != 0)[0]
                 pitch[nonzero_idxs] = np.log(pitch[nonzero_idxs])
 
-                for i, phoneme in enumerate(phonemes):
-                    pitch[i] = (pitch[i] - float(self.statistic_dict[phoneme]["pitch_mean"])) / float(self.statistic_dict[phoneme]["pitch_std"])
-                    energy[i] = (energy[i] - float(self.statistic_dict[phoneme]["pitch_mean"])) / float(self.statistic_dict[phoneme]["pitch_std"])
-                
                 energy_max_value = max(energy_max_value, max(energy))
                 energy_min_value = min(energy_min_value, min(energy))
 

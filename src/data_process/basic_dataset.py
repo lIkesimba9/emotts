@@ -108,7 +108,7 @@ class BasicDataset(Dataset[BasicSample]):
 
         for i, phoneme in enumerate(phonemes):
             if self.energy_norm:
-                energy[i] = (energy[i] - float(self.statistic_dict[phoneme]["pitch_mean"])) / float(self.statistic_dict[phoneme]["pitch_std"])
+                energy[i] = (energy[i] - float(self.statistic_dict[phoneme]["energy_mean"])) / float(self.statistic_dict[phoneme]["energy_std"])
             if self.pitch_norm:
                 pitch[i] = (pitch[i] - float(self.statistic_dict[phoneme]["pitch_mean"])) / float(self.statistic_dict[phoneme]["pitch_std"])
                 
