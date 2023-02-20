@@ -10,6 +10,11 @@ class Idomp(nn.Module):
     def forward(x: torch.Tensor) -> torch.Tensor:
         return x
 
+class IdompSecond(nn.Module):
+    @staticmethod
+    def forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return y
+
 
 class LinearWithActivation(torch.nn.Module):
 
@@ -72,6 +77,38 @@ class Conv1DNorm(torch.nn.Module):
         conv_signal = self.conv(signal)
         normed_signal = self.batch_norm(conv_signal)
         return self.dropout(self.relu(normed_signal))
+
+class Conv1DNormDurationPrep(torch.nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int = 1,
+        stride: int = 1,
+        padding: int = None,
+        dilation: int = 1,
+        bias: bool = True,
+        dropout_rate: float = 0.1,
+        w_init_gain: str = "linear",
+    ):
+        self.conv = Conv1DNorm(in_channels, out_channels, kernel_size, stride,
+                                     padding, dilation, bias, dropout_rate, w_init_gain)
+        self.dense = LinearWithActivation(in_dim=out_channels, out_dim=1, bias=False)    
+
+    def forward(self, phonem_seq: torch.Tensor, duration_seq: torch.Tensor) -> torch.Tensor:
+        duration_seq = duration_seq.unsqueeze(-1)
+        print("duration_seq")
+        print(duration_seq.shape)
+        seq = torch.cat((phonem_seq, duration_seq), -1)
+        print("seq")
+        print(seq.shape)
+        conv_seq = self.conv(seq)
+        print("conv_seq")
+        print(conv_seq.shape)
+        scalar_seq = self.dense(conv_seq)
+        print("scalar_seq")
+        print(scalar_seq.shape)
+        return scalar_seq
 
 
 class Conv2DNorm(torch.nn.Module):

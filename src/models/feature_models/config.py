@@ -10,6 +10,14 @@ class DurationParams:
     dropout: float = field(default=0.5)
     duration_type: str = field(default="int")
 
+@dataclass
+class DurationPreparationParams:
+    method: str = field(default="identity")
+    conv_config: ConvDurationPrepParams
+
+@dataclass
+class ConvDurationPrepParams:
+    inner_channels: int = field(default=64)
 
 @dataclass
 class RangeParams:
