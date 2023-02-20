@@ -15,11 +15,11 @@ finetune: false
 test_size: 0.05
 device: cuda:0
 lang: english
-checkpoint_name: nat_va_after_duration_upsample
+checkpoint_name: nat_va_after_duration_conv
 data:
   mels_dir: data/Jan25_preprocessed/mels
   wav_dir: data/Jan25_preprocessed/resampled
-  feature_dir: data/feature_output/nat_va_after_duration_upsample
+  feature_dir: data/feature_output/nat_va_after_duration_conv
   duration_dir: data/Jan25_preprocessed/duration
   pitch_dir: data/Jan25_preprocessed/pitch
   energy_dir: data/Jan25_preprocessed/energy
@@ -27,7 +27,7 @@ data:
   speaker_emb_dir: data/Jan25_preprocessed/embeddings
   ignore_speakers: []
 pretrained_hifi: models/en/hifi
-base_model: checkpoints/nat_va_after_duration_upsample/feature
+base_model: checkpoints/nat_va_after_duration_conv/feature
 
 fastspeech2:
   use_gst: true
@@ -150,9 +150,9 @@ model:
     attention_dropout: 0.1
     positional_dropout: 0.0
   duration_preparation:
-    method: "identity"
+    method: "conv"
     conv_config:
-      inner_channels: 64 
+      inner_channels: 57 
   decoder_config:
     prenet_layers:
       - 256

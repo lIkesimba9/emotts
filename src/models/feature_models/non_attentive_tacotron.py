@@ -23,10 +23,10 @@ from .config import (
     RangeParams,
 )
 from .gst import GST
-from .layers import Conv1DNorm, LinearWithActivation, PositionalEncoding
+from .layers import Conv1DNorm, LinearWithActivation, PositionalEncoding, IdompSecond, Conv1DNormDurationPrep
 from .utils import get_mask_from_lengths, norm_emb_layer
 
-from src.models.fastspeech2.modules import VariancePredictor, VarianceAdaptorParams
+from src.models.fastspeech2.modules import VariancePredictor, VarianceAdaptorParams, LengthRegulator
 
 
 class Prenet(nn.Module):
@@ -218,7 +218,7 @@ class Attention(nn.Module):
         embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
         return durations.squeeze(2), embeddings_per_duration
 
-    def inference(
+    def inference_with_durations(
         self, embeddings: torch.Tensor, input_lengths: torch.Tensor
     ) -> torch.Tensor:
 
@@ -228,6 +228,11 @@ class Attention(nn.Module):
 
         embeddings_per_duration = torch.matmul(scores.transpose(1, 2), embeddings)
         embeddings_per_duration = self.positional_encoder(embeddings_per_duration)
+        return embeddings_per_duration, durations
+
+    def inference(self, embeddings: torch.Tensor, input_lengths: torch.Tensor
+    ) -> torch.Tensor:
+        embeddings_per_duration, durations = self.inference_with_durations(embeddings, input_lengths)
         return embeddings_per_duration
 
 
@@ -902,6 +907,8 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         super().__init__()
 
         self.n_frames_per_step = config.n_frames_per_step
+        self.duration_preparation_type = config.duration_preparation.method
+        self.duration_prep_config = config.duration_preparation.conv_config
 
         full_embedding_dim = (
             config.phonem_embedding_dim
@@ -933,6 +940,13 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         )
         self.attention = Attention(full_embedding_dim, config.attention_config)
         self.gst = GST(n_mel_channels=n_mel_channels, config=gst_config)
+        self.length_regulator = LengthRegulator()
+
+        if self.duration_preparation_type == "identity":
+            self.duration_preparation = IdompSecond()
+        elif self.duration_preparation_type == "conv":
+            self.duration_preparation = Conv1DNormDurationPrep(in_channels = config.phonem_embedding_dim + 1,
+                                                out_channels = self.duration_prep_config.inner_channels)
 
         self.variance_adaptor = VarianceAdaptor(variance_adaptor_config, pitch_min, pitch_max, 
             energy_min, energy_max, 
@@ -982,10 +996,18 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         durations, attented_embeddings = self.attention(
             embeddings, batch.num_phonemes, batch.durations
         )
-        embedings_energy_pitch = torch.cat((embedding_energy, embedding_pitch), dim=-1).sum(dim=1).unsqueeze(1).repeat(1, attented_embeddings.shape[1], 1)
 
-        attented_embeddings = torch.cat((attented_embeddings, embedings_energy_pitch), dim=-1)
-        
+        durations_for_rounding = self.duration_preparation(phonem_emb, durations)
+
+        max_decoder_seq_length = attented_embeddings.shape[1]
+
+        ## NOTE: length_regulator has conversion to int inside it (rounds to the nearest int)...  
+        upsampled_embedding_energy, _ = self.length_regulator(embedding_energy, durations_for_rounding, max_decoder_seq_length)
+        upsampled_embedding_pitch, _ = self.length_regulator(embedding_pitch, durations_for_rounding, max_decoder_seq_length)
+
+        embeddings_energy_pitch = torch.cat((upsampled_embedding_energy, upsampled_embedding_pitch), dim=-1)
+
+        attented_embeddings = torch.cat((attented_embeddings, embeddings_energy_pitch), dim=-1)
         
         mel_outputs = self.decoder(attented_embeddings, batch.mels)
         
@@ -1037,10 +1059,19 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         )
         
 
-        attented_embeddings = self.attention.inference(embeddings, text_lengths)
+        attented_embeddings, predicted_durations = self.attention.inference_with_durations(embeddings, 
+                                                                                           text_lengths)
 
-        embedings_energy_pitch = torch.cat((embedding_energy, embedding_pitch), dim=-1).sum(dim=1).unsqueeze(1).repeat(1, attented_embeddings.shape[1], 1)
-        attented_embeddings = torch.cat((attented_embeddings, embedings_energy_pitch), dim=-1)
+        durations_for_rounding = self.duration_preparation(phonem_emb, predicted_durations)
+        max_decoder_seq_length = attented_embeddings.shape[1]
+
+        ## NOTE: length_regulator has conversion to int inside it (rounds to the nearest int)...
+        upsampled_embedding_energy, _ = self.length_regulator(embedding_energy, durations_for_rounding, max_decoder_seq_length)
+        upsampled_embedding_pitch, _ = self.length_regulator(embedding_pitch, durations_for_rounding, max_decoder_seq_length)
+
+        embeddings_energy_pitch = torch.cat((upsampled_embedding_energy, upsampled_embedding_pitch), dim=-1)
+
+        attented_embeddings = torch.cat((attented_embeddings, embeddings_energy_pitch), dim=-1)
 
         mel_outputs = self.decoder.inference(attented_embeddings)
         mel_outputs_postnet = self.postnet(mel_outputs.transpose(1, 2))

@@ -15,19 +15,19 @@ finetune: true
 test_size: 0.05
 device: cuda:0
 lang: english
-checkpoint_name: nat_va_after_duration_tune
+checkpoint_name: nat_va_after_duration_upsample_tune
 data:
-  mels_dir: data/preprocessed/mels
-  wav_dir: data/preprocessed/resampled
-  feature_dir: data/feature_output/nat_va_after_duration
-  duration_dir: data/preprocessed/duration
-  pitch_dir: data/preprocessed/pitch
-  energy_dir: data/preprocessed/energy
-  text_dir: data/preprocessed/mfa_outputs
-  speaker_emb_dir: data/preprocessed/embeddings
+  mels_dir: data/Jan25_preprocessed_emo_only/mels
+  wav_dir: data/Jan25_preprocessed_emo_only/resampled
+  feature_dir: data/feature_output/nat_va_after_duration_upsample_tune
+  duration_dir: data/Jan25_preprocessed_emo_only/duration
+  pitch_dir: data/Jan25_preprocessed_emo_only/pitch
+  energy_dir: data/Jan25_preprocessed_emo_only/energy
+  text_dir: data/Jan25_preprocessed_emo_only/mfa_outputs
+  speaker_emb_dir: data/Jan25_preprocessed_emo_only/embeddings
   ignore_speakers: []
 pretrained_hifi: models/en/hifi
-base_model: checkpoints/nat_va_after_duration/feature
+base_model: checkpoints/nat_va_after_duration_upsample/feature
 
 fastspeech2:
   use_gst: true
@@ -139,6 +139,7 @@ model:
       lstm_layers: 2
       lstm_hidden: 256
       dropout: 0.5
+      duration_type: "float"
     range_config:
       lstm_layers: 2
       lstm_hidden: 256
@@ -148,6 +149,10 @@ model:
     teacher_forcing_ratio: 1.0
     attention_dropout: 0.1
     positional_dropout: 0.0
+  duration_preparation:
+    method: "identity"
+    conv_config:
+      inner_channels: 64
   decoder_config:
     prenet_layers:
       - 256

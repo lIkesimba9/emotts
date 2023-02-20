@@ -10,6 +10,15 @@ class DurationParams:
     dropout: float = field(default=0.5)
     duration_type: str = field(default="int")
 
+@dataclass
+class ConvDurationPrepParams:
+    inner_channels: int = field(default=64)
+
+
+@dataclass
+class DurationPreparationParams:
+    conv_config: ConvDurationPrepParams
+    method: str = field(default="identity")
 
 @dataclass
 class RangeParams:
@@ -76,6 +85,7 @@ class ModelParams:
 
     encoder_config: EncoderParams
     attention_config: GaussianUpsampleParams
+    duration_preparation: DurationPreparationParams
     decoder_config: DecoderParams
     postnet_config: PostNetParams
     n_frames_per_step: int = field(default=3)
