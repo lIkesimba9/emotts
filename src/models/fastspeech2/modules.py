@@ -170,7 +170,7 @@ class VarianceAdaptor(nn.Module):
         else:
             prediction = prediction * control
             denorm_prediction = prediction
-            if elf.energy_norm:
+            if self.energy_norm:
                 denorm_prediction = self.denormalize_energy(prediction, phonemes)  
             embedding = self.energy_embedding(
                 torch.bucketize(denorm_prediction, self.energy_bins)
