@@ -227,7 +227,7 @@ class Trainer:
                 self.statistic_dict = json.load(f)
 
 
-			self.phonemes_statistic_dict = {
+            self.phonemes_statistic_dict = {
              id_phoneme: {
                 "pitch_mean": float(self.statistic_dict[phoneme]["pitch_mean"]),
                 "pitch_std": float(self.statistic_dict[phoneme]["pitch_std"]),
