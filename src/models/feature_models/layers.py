@@ -49,6 +49,7 @@ class Conv1DNorm(torch.nn.Module):
         dilation: int = 1,
         bias: bool = True,
         dropout_rate: float = 0.1,
+        groups: int = 1,
         w_init_gain: str = "linear",
     ):
         super().__init__()
@@ -59,6 +60,7 @@ class Conv1DNorm(torch.nn.Module):
         self.conv = torch.nn.Conv1d(
             in_channels,
             out_channels,
+            groups=groups,
             kernel_size=(kernel_size,),
             stride=(stride,),
             padding=padding,
@@ -91,23 +93,19 @@ class Conv1DNormDurationPrep(torch.nn.Module):
         dropout_rate: float = 0.1,
         w_init_gain: str = "linear",
     ):
+        super().__init__()
+        groups=out_channels
         self.conv = Conv1DNorm(in_channels, out_channels, kernel_size, stride,
-                                     padding, dilation, bias, dropout_rate, w_init_gain)
+                                     padding, dilation, bias, dropout_rate, groups, w_init_gain)
         self.dense = LinearWithActivation(in_dim=out_channels, out_dim=1, bias=False)    
 
     def forward(self, phonem_seq: torch.Tensor, duration_seq: torch.Tensor) -> torch.Tensor:
         duration_seq = duration_seq.unsqueeze(-1)
-        print("duration_seq")
-        print(duration_seq.shape)
         seq = torch.cat((phonem_seq, duration_seq), -1)
-        print("seq")
-        print(seq.shape)
+        seq = seq.transpose(2,1)
         conv_seq = self.conv(seq)
-        print("conv_seq")
-        print(conv_seq.shape)
+        conv_seq = conv_seq.transpose(2,1)
         scalar_seq = self.dense(conv_seq)
-        print("scalar_seq")
-        print(scalar_seq.shape)
         return scalar_seq
 
 

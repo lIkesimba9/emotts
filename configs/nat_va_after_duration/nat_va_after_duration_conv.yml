@@ -152,7 +152,7 @@ model:
   duration_preparation:
     method: "conv"
     conv_config:
-      inner_channels: 64 
+      inner_channels: 57 
   decoder_config:
     prenet_layers:
       - 256

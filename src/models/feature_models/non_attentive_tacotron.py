@@ -23,7 +23,7 @@ from .config import (
     RangeParams,
 )
 from .gst import GST
-from .layers import Conv1DNorm, LinearWithActivation, PositionalEncoding, IdompSecond
+from .layers import Conv1DNorm, LinearWithActivation, PositionalEncoding, IdompSecond, Conv1DNormDurationPrep
 from .utils import get_mask_from_lengths, norm_emb_layer
 
 from src.models.fastspeech2.modules import VariancePredictor, VarianceAdaptorParams, LengthRegulator
