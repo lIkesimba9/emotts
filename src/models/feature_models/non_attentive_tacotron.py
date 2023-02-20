@@ -1062,10 +1062,8 @@ class NonAttentiveTacotronVoicePrintVarianceAdaptorU(nn.Module):
         max_decoder_seq_length = attented_embeddings.shape[1]
 
         ## NOTE: length_regulator has conversion to int inside it (rounds to the nearest int)...
-        upsampled_embedding_energy, _ = self.length_regulator(embedding_energy, durations_for_rounding, max_decoder_
-seq_length)
-        upsampled_embedding_pitch, _ = self.length_regulator(embedding_pitch, durations_for_rounding, max_decoder_se
-q_length)
+        upsampled_embedding_energy, _ = self.length_regulator(embedding_energy, durations_for_rounding, max_decoder_seq_length)
+        upsampled_embedding_pitch, _ = self.length_regulator(embedding_pitch, durations_for_rounding, max_decoder_seq_length)
 
         embeddings_energy_pitch = torch.cat((upsampled_embedding_energy, upsampled_embedding_pitch), dim=-1)
 
