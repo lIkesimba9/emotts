@@ -129,7 +129,7 @@ class VarianceAdaptor(nn.Module):
         for i in range(batch_size):
             for j in range(phonemes_count):
                 if phonemes[i, j] in self.phonemes_statistic_dict:
-                    denorm_values[i, j] = (values[i, j] + self.phonemes_statistic_dict[phonemes[i, j]][key_mean]) * self.phonemes_statistic_dict[phonemes[i, j]][key_std]
+                    denorm_values[i, j] = values[i, j] * self.phonemes_statistic_dict[phonemes[i, j]][key_std] + self.phonemes_statistic_dict[phonemes[i, j]][key_mean]
                 else:
                     denorm_values[i, j] = values[i, j]
         return denorm_values
@@ -424,7 +424,7 @@ class VarianceAdaptorGaus(nn.Module):
         for i in range(batch_size):
             for j in range(phonemes_count):
                 if phonemes[i, j] in self.phonemes_statistic_dict:
-                    denorm_values[i, j] = (values[i, j] + self.phonemes_statistic_dict[phonemes[i, j]][key_mean]) * self.phonemes_statistic_dict[phonemes[i, j]][key_std]
+                    denorm_values[i, j] = values[i, j] * self.phonemes_statistic_dict[phonemes[i, j]][key_std] + self.phonemes_statistic_dict[phonemes[i, j]][key_mean]
                 else:
                     denorm_values[i, j] = values[i, j]
         return denorm_values
