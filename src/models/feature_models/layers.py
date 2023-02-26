@@ -100,7 +100,10 @@ class Conv1DNormDurationPrep(torch.nn.Module):
         self.dense = LinearWithActivation(in_dim=out_channels, out_dim=1, bias=False)    
 
     def forward(self, phonem_seq: torch.Tensor, duration_seq: torch.Tensor) -> torch.Tensor:
-        duration_seq = duration_seq.unsqueeze(-1)
+        if (len(duration_seq.shape) < 3):
+            duration_seq = duration_seq.unsqueeze(-1)
+        ##print("((phonem_seq, duration_seq))")
+        ##print((phonem_seq.shape, duration_seq.shape))
         seq = torch.cat((phonem_seq, duration_seq), -1)
         seq = seq.transpose(2,1)
         conv_seq = self.conv(seq)
