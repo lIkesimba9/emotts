@@ -38,6 +38,7 @@ class Inferencer:
         self.sample_rate = config.sample_rate
         self.hop_size = config.hop_size
         self.frames_per_step = config.model.n_frames_per_step
+        self.duration_type = config.model.attention_config.duration_config.duration_type
         self.device = torch.device(config.device)
         self.feature_model: NonAttentiveTacotronVoicePrintVarianceAdaptorU = torch.load(
             checkpoint_path / FEATURE_MODEL_FILENAME, map_location=config.device
@@ -142,13 +143,30 @@ class Inferencer:
             for phoneme in phonemes:
                 phoneme_ids.append(self.phonemes_to_idx[phoneme])
 
-	    durations_in_frames = np.array(
-                [
-                    int(np.round(seconds_to_frame(x.end_time))) - int(np.round(seconds_to_frame(x.start_time)))
-                    for x in phones_tier.get_copy_with_gaps_filled()
-                ],
-                dtype=np.float32
-            )
+            if (self.duration_type == "int"):
+                durations_in_frames = np.array(
+                        [
+                                int(np.round(seconds_to_frame(x.end_time,
+                                    self.sample_rate, self.hop_size))) - int(np.round(seconds_to_frame(x.start_time,
+                                    self.sample_rate, self.hop_size)))
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+            elif (self.duration_type == "float"):
+                durations_in_frames = np.array(
+                        [
+                                seconds_to_frame(x.end_time,
+                                    self.sample_rate, self.hop_size) - seconds_to_frame(x.start_time,
+                                    self.sample_rate, self.hop_size)
+                                for x in phones_tier.get_copy_with_gaps_filled()
+                        ],
+                        dtype=np.float32
+                )
+            else:
+                raise ValueError("Unknown value for duration_type: " + self.duration_type)
+
+
             energy = np.load(energy_path)
             pitch = np.load(pitch_path)
             
@@ -159,7 +177,7 @@ class Inferencer:
                 mels = torch.from_numpy(np.load(mels_path)).unsqueeze(0)
             mels = (mels - self.mels_mean) / self.mels_std
 
-            pad_size = mels.shape[-1] - np.int64(durations.sum())
+            pad_size = mels.shape[-1] - np.int64(durations_in_frames.sum())
             ##if pad_size < 0:
             ## NOTE: make this behaviour consistent with trainin-batch processing (see trainer files)
             durations_in_frames[-1] += pad_size
@@ -170,9 +188,13 @@ class Inferencer:
 
             durations_in_steps = durations_in_frames
             ## convert number of frames to number of decoder steps
-            if (self.frames_per_step > 1):
-                durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
-            durations_in_steps = durations_in_steps.astype(np.int32)
+            if (self.duration_type == "int"):
+                if (self.frames_per_step > 1):
+                    durations_in_steps = np.ceil(durations_in_frames.astype('float32')/self.frames_per_step)
+                durations_in_steps = durations_in_steps.astype(np.int32)
+            elif (self.duration_type == "float"):
+                if (self.frames_per_step > 1):
+                    durations_in_steps = durations_in_frames.astype('float32')/self.frames_per_step
 
             speaker_emb_path = (self._speaker_emb_dir / sample).with_suffix(self._speaker_emb_ext)
             speaker_emb_array = np.load(str(speaker_emb_path)).astype(np.float32)
