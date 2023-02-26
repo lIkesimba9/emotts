@@ -10,24 +10,24 @@ batch_size: 16
 grad_clip_thresh: 1.0
 log_steps: 1000
 iters_per_checkpoint: 30000
-total_iterations: 300001
-finetune: true
+total_iterations: 500001
+finetune: false
 test_size: 0.05
 device: cuda:0
 lang: english
-checkpoint_name: nat_va_after_duration_conv_tune
+checkpoint_name: nat_va_after_duration_upsample_vctk
 data:
-  mels_dir: data/Jan25_preprocessed/mels
-  wav_dir: data/Jan25_preprocessed/resampled
-  feature_dir: data/feature_output/nat_va_after_duration_conv_tune
-  duration_dir: data/Jan25_preprocessed/duration
-  pitch_dir: data/Jan25_preprocessed/pitch
-  energy_dir: data/Jan25_preprocessed/energy
-  text_dir: data/Jan25_preprocessed/mfa_outputs
-  speaker_emb_dir: data/Jan25_preprocessed/embeddings
+  mels_dir: data/Jan25_preprocessed_vctk_only/mels
+  wav_dir: data/Jan25_preprocessed_vctk_only/resampled
+  feature_dir: data/feature_output/nat_va_after_duration_upsample_vctk
+  duration_dir: data/Jan25_preprocessed_vctk_only/duration
+  pitch_dir: data/Jan25_preprocessed_vctk_only/pitch
+  energy_dir: data/Jan25_preprocessed_vctk_only/energy
+  text_dir: data/Jan25_preprocessed_vctk_only/mfa_outputs
+  speaker_emb_dir: data/Jan25_preprocessed_vctk_only/embeddings
   ignore_speakers: []
 pretrained_hifi: models/en/hifi
-base_model: checkpoints/nat_va_after_duration_conv/feature
+base_model: checkpoints/nat_va_after_duration_upsample_vctk/feature
 
 fastspeech2:
   use_gst: true
@@ -150,9 +150,9 @@ model:
     attention_dropout: 0.1
     positional_dropout: 0.0
   duration_preparation:
-    method: "conv"
+    method: "identity"
     conv_config:
-      inner_channels: 57
+      inner_channels: 64 
   decoder_config:
     prenet_layers:
       - 256
