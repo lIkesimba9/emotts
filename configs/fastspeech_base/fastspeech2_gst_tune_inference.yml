@@ -102,7 +102,7 @@ train_hifi:
   summary_interval: 1000
   fine_tuning: true
   fmax_loss: null
-  batch_size: 32
+  batch_size: 16
   learning_rate: 0.0002
   adam_b1: 0.8
   adam_b2: 0.99

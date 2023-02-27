@@ -19,14 +19,14 @@ checkpoint_name: fastspeech2_energy_coef_01_denorm_tune
 data:
   dataset_name: emo_dataset
   context_lenght: 0
-  mels_dir: data/Jan25_preprocessed/mels
-  wav_dir: data/Jan25_preprocessed/resampled_16
+  mels_dir: /mnt/public32/emotts/data/preprocessed/mels
+  wav_dir: /mnt/public32/emotts/data/preprocessed/resampled_16
   feature_dir: data/feature_output/fastspeech2_energy_coef_01_denorm
-  duration_dir: data/Jan25_preprocessed/duration
-  pitch_dir: data/Jan25_preprocessed/pitch
-  energy_dir: data/Jan25_preprocessed/energy
-  text_dir: data/Jan25_preprocessed/mfa_outputs
-  speaker_emb_dir: data/Jan25_preprocessed/embeddings
+  duration_dir: /mnt/public32/emotts/data/preprocessed/duration
+  pitch_dir: /mnt/public32/emotts/data/preprocessed/pitch
+  energy_dir: /mnt/public32/emotts/data/preprocessed/energy
+  text_dir: /mnt/public32/emotts/data/preprocessed/mfa_outputs
+  speaker_emb_dir: /mnt/public32/emotts/data/preprocessed/embeddings
   ignore_speakers:
     - p280
     - p315
@@ -40,7 +40,6 @@ data:
     - '0016'
     - '0017'
     - '0018'
-    - '0019'
     - '0020'
   pitch_norm: true
   energy_norm: true
@@ -104,7 +103,7 @@ train_hifi:
   summary_interval: 1000
   fine_tuning: true
   fmax_loss: null
-  batch_size: 32
+  batch_size: 16
   learning_rate: 0.0002
   adam_b1: 0.8
   adam_b2: 0.99

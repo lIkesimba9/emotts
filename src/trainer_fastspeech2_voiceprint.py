@@ -482,7 +482,7 @@ class Trainer:
                             }
                         )                        
 
-                if self.iteration_step % self.config.iters_per_checkpoint == 0 or self.iteration_step == 15000:
+                if self.iteration_step % self.config.iters_per_checkpoint == 0 or self.iteration_step == 30000:
                     self.fastspeech2_model.eval()
                     self.validate()
                     self.generate_samples()
