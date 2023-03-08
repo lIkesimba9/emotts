@@ -203,11 +203,13 @@ class Attention(nn.Module):
         input_lengths = input_lengths.cpu().numpy()
 
         durations = self.duration_predictor(embeddings, input_lengths)
-        ranges = self.range_predictor(embeddings, durations, input_lengths)
+        ##ranges = self.range_predictor(embeddings, durations, input_lengths)
 
         if random.uniform(0, 1) > self.teacher_forcing_ratio:  # type: ignore
+            ranges = self.range_predictor(embeddings, durations, input_lengths)
             scores = self.calc_scores(durations, ranges)
         else:
+            ranges = self.range_predictor(embeddings, y_durations.unsqueeze(2), input_lengths)
             scores = self.calc_scores(y_durations.unsqueeze(2), ranges)
 
         embeddings_per_duration = torch.matmul(scores.transpose(1, 2), embeddings)
